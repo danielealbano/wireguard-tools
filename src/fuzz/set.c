@@ -16,6 +16,7 @@ static FILE *hacked_fopen(const char *pathname, const char *mode);
 #define fopen hacked_fopen
 #include "../config.c"
 #include "../set.c"
+#undef fopen
 #undef stderr
 
 #include <string.h>
@@ -38,6 +39,12 @@ int LLVMFuzzerTestOneInput(const char *data, size_t data_len)
 {
 	char *argv[8192] = { "set", "wg0" }, *args;
 	size_t argc = 2;
+	static FILE *devnull;
+
+	if (!devnull) {
+		assert((devnull = fopen("/dev/null", "r+")));
+		stdout = stderr = devnull;
+	}
 
 	if (!data_len)
 		return 0;
