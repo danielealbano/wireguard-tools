@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, clang]
+    steps:
+      - name: Install toolchain
+        run: |
+          apt-get update
+          apt-get install -y ${{ matrix.cc }} libc6-dev make git ca-certificates
+      - uses: actions/checkout@v4
+      - name: Build (warnings as errors)
+        env:
+          CFLAGS: -O2 -Werror
+        run: make -C src CC=${{ matrix.cc }}
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (warnings as errors)
+        env:
+          CFLAGS: -O2 -Werror
+        run: make -C src
+
+  analyze:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - name: Install toolchain
+        run: |
+          apt-get update
+          apt-get install -y clang clang-tools clang-tidy libc6-dev make git perl ca-certificates
+      - uses: actions/checkout@v4
+      - name: clang-tidy (analysis gate)
+        working-directory: src
+        run: |
+          for f in config.c ipc.c encoding.c genkey.c pubkey.c set.c setconf.c show.c showconf.c terminal.c wg.c curve25519.c; do
+            echo "== clang-tidy $f =="
+            clang-tidy "$f" --quiet -- -std=gnu99 -D_GNU_SOURCE -isystem uapi/linux -DRUNSTATEDIR='"/var/run"' -I.
+          done
+      # scan-build runs the broader default checker set (including noisy ones such
+      # as the errno-state checker) and is informational only — the deterministic
+      # clang-analyzer-* gate lives in clang-tidy above. Its HTML report is uploaded
+      # for inspection; this step never fails the build.
+      - name: scan-build (informational)
+        run: |
+          scan-build -o scan-out make -C src wg || true
+          echo "scan-build reports: $(find scan-out -name 'report-*.html' 2>/dev/null | wc -l)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scan-build-report
+          path: scan-out
+          if-no-files-found: ignore
+
+  fuzz:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - name: Install toolchain
+        run: |
+          apt-get update
+          apt-get install -y clang llvm libc6-dev make git ca-certificates
+      - uses: actions/checkout@v4
+      - name: Build fuzzers (libFuzzer + ASan + UBSan)
+        working-directory: src/fuzz
+        env:
+          CFLAGS: -O1 -g -fsanitize=undefined
+        run: make
+      - name: Smoke each fuzzer
+        working-directory: src/fuzz
+        env:
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+          ASAN_OPTIONS: detect_leaks=1
+        run: |
+          for f in config uapi stringlist cmd set setconf; do
+            echo "== fuzz $f =="
+            ./"$f" -max_total_time=30 -print_final_stats=1
+          done
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - name: Install toolchain
+        run: |
+          apt-get update
+          apt-get install -y clang llvm libc6-dev make git ca-certificates
+      - uses: actions/checkout@v4
+      - name: MemorySanitizer fuzz smoke (parsers)
+        working-directory: src/fuzz
+        env:
+          MSAN_OPTIONS: halt_on_error=1
+        run: |
+          MSAN="-O1 -g -fsanitize=fuzzer,memory -fsanitize-memory-track-origins -std=gnu11 -isystem ../uapi/linux -D_GNU_SOURCE"
+          for h in config uapi stringlist; do
+            echo "== build+smoke msan $h =="
+            clang $MSAN -o "msan-$h" "$h.c"
+            ./"msan-$h" -max_total_time=30 -print_final_stats=1
+          done

@@ -1,0 +1,43 @@
+# clang-tidy configuration for wireguard-tools.
+#
+# The gate is the Clang Static Analyzer (clang-analyzer-*) plus the genuine
+# bug-finding families (bugprone-*, performance-*, portability-*). Stylistic /
+# include-what-you-use / naming families are intentionally NOT enabled: the code
+# is upstream WireGuard C, and this fork keeps the upstream diff minimal (see
+# .claude/rules/project.md — MINIMAL UPSTREAM DIFF), so no reformatting churn.
+#
+# The individually disabled bugprone checks below fire only on deliberate,
+# correct upstream idioms — not on defects — and enabling them would require
+# rewriting that upstream code:
+#   assignment-in-if-condition            -> the `key_match`/`get_value` idiom in config.c
+#   inc-dec-in-conditions                 -> the getaddrinfo retry loop (`!retries--`)
+#   suspicious-string-compare             -> boolean use of strcmp-family return values
+#   switch-missing-default-case           -> exhaustive switches over known values
+#   easily-swappable-parameters           -> style, not a defect
+#   implicit-widening-of-multiplication-result / narrowing-conversions
+#                                         -> benign, bounded arithmetic (sanitizer-clean)
+#   multi-level-implicit-pointer-conversion, reserved-identifier
+#                                         -> conforming upstream constructs
+#   macro-parentheses                     -> the NUM() macro in ipc-uapi.h; all callers
+#                                            pass simple constants (left upstream-verbatim)
+#
+# clang-analyzer-* reports ZERO on the current tree (matches `make -C src check`
+# via scan-build). Any NEW finding from the enabled families fails CI.
+Checks: >
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  -bugprone-assignment-in-if-condition,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-inc-dec-in-conditions,
+  -bugprone-switch-missing-default-case,
+  -bugprone-narrowing-conversions,
+  -bugprone-multi-level-implicit-pointer-conversion,
+  -bugprone-reserved-identifier,
+  -bugprone-suspicious-string-compare,
+  -bugprone-macro-parentheses
+HeaderFilterRegex: '(config|ipc|ipc-uapi|ipc-uapi-unix|ipc-linux|containers|encoding|ctype|terminal|subcommands|curve25519)\.h$'
+WarningsAsErrors: '*'
