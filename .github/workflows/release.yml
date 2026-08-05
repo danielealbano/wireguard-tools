@@ -23,8 +23,8 @@ jobs:
     steps:
       - name: Install toolchain
         run: |
-          apt-get update
-          apt-get install -y make git gcc libc6-dev bash xz-utils ca-certificates ${{ matrix.cross }}
+          for i in 1 2 3 4 5; do apt-get update && break || sleep 10; done
+          apt-get install -y -o Acquire::Retries=3 make git gcc libc6-dev bash xz-utils ca-certificates ${{ matrix.cross }}
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0

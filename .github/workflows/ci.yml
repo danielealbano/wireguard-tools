@@ -19,8 +19,8 @@ jobs:
     steps:
       - name: Install toolchain
         run: |
-          apt-get update
-          apt-get install -y ${{ matrix.cc }} libc6-dev make git ca-certificates
+          for i in 1 2 3 4 5; do apt-get update && break || sleep 10; done
+          apt-get install -y -o Acquire::Retries=3 ${{ matrix.cc }} libc6-dev make git ca-certificates
       - uses: actions/checkout@v4
       - name: Build (warnings as errors)
         env:
@@ -42,8 +42,8 @@ jobs:
     steps:
       - name: Install toolchain
         run: |
-          apt-get update
-          apt-get install -y clang clang-tools clang-tidy libc6-dev make git perl ca-certificates
+          for i in 1 2 3 4 5; do apt-get update && break || sleep 10; done
+          apt-get install -y -o Acquire::Retries=3 clang clang-tools clang-tidy libc6-dev make git perl ca-certificates
       - uses: actions/checkout@v4
       - name: clang-tidy (analysis gate)
         working-directory: src
@@ -73,8 +73,8 @@ jobs:
     steps:
       - name: Install toolchain
         run: |
-          apt-get update
-          apt-get install -y clang llvm libc6-dev make git ca-certificates
+          for i in 1 2 3 4 5; do apt-get update && break || sleep 10; done
+          apt-get install -y -o Acquire::Retries=3 clang llvm libc6-dev make git ca-certificates
       - uses: actions/checkout@v4
       - name: Build fuzzers (libFuzzer + ASan + UBSan)
         working-directory: src/fuzz
@@ -98,8 +98,8 @@ jobs:
     steps:
       - name: Install toolchain
         run: |
-          apt-get update
-          apt-get install -y clang llvm libc6-dev make git ca-certificates
+          for i in 1 2 3 4 5; do apt-get update && break || sleep 10; done
+          apt-get install -y -o Acquire::Retries=3 clang llvm libc6-dev make git ca-certificates
       - uses: actions/checkout@v4
       - name: MemorySanitizer fuzz smoke (parsers)
         working-directory: src/fuzz
