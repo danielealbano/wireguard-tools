@@ -45,7 +45,8 @@ Authoritative detail lives in `docs/PROJECT.md`.
 | Build | **GNU make** (`src/Makefile`) | Authoritative command surface; `PLATFORM` from `uname -s`. |
 | Crypto | in-repo Curve25519 (fiat32 / hacl64) | Key derivation + clamping only. Constant-time encoders in `encoding.c`/`ctype.h`. |
 | Netlink | vendored mini-libmnl (`src/netlink.h`) | No external libmnl. |
-| Static analysis | scan-build (`make -C src check`) | clang-tidy (incl. `clang-analyzer-*`) gate is roadmap work; clang-format is deliberately NOT used. |
+| Static analysis | **clang-tidy** (`src/.clang-tidy`) gate + scan-build (`make -C src check`) | clang-tidy (`clang-analyzer-*` + curated bugprone/perf/portability) is the CI gate; scan-build is informational/local. clang-format deliberately NOT used. |
+| CI / Release | **GitHub Actions** (`.github/workflows/`) | `ci.yml` (build gcc+clang/macOS, clang-tidy, fuzz+MSan smoke, parallel); `release.yml` (`v*` tags → Linux amd64/arm64 + macOS universal tarballs + SHA256SUMS). |
 | Fuzzing | libFuzzer + ASan (`src/fuzz/`, clang) | Six harnesses: config/CLI parsers, UAPI response parsing, interface-list handling, command dispatch. |
 | Unit tests | **Unity**, vendored (planned) | Lands with the fork's test-suite pass; policy in `c.md` §3. |
 | Windows | llvm-mingw + `src/wincompat/` | Windows ≥ 10. |
@@ -134,7 +135,11 @@ The **`src/Makefile`** is the authoritative command surface (details in `docs/PR
 - `make -C src install` — install binary, man pages, completions, wg-quick, systemd units.
 - `make -C src clean`.
 - `make -C src/fuzz` — build the libFuzzer harnesses (clang required).
+- `make -C src check` — scan-build (Clang Static Analyzer, HTML; local deep-dive).
 - Cross/variants: `PLATFORM=<os>`, `DEBUG=yes`, `V=1`.
+- CI (`.github/workflows/ci.yml`) enforces: `CFLAGS="-O2 -Werror" make -C src CC=<gcc|clang>`,
+  clang-tidy per file (config `src/.clang-tidy`), fuzz ASan+UBSan smoke, MSan parser smoke —
+  parallel, Linux (`ubuntu:26.04` container) + macOS. `release.yml` builds tagged artifacts.
 
 **Quality gates (current)**: warnings-clean build on the touched platforms + `make -C src
 check` clean + fuzz harnesses still building. **Quality gates (target, per `c.md` §4 — wired

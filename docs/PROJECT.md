@@ -169,8 +169,18 @@ The **`src/Makefile` is the authoritative command surface**. Current targets:
 - Cross-compile: `make -C src PLATFORM=windows` (llvm-mingw); `DEBUG=yes` adds `-g`; `V=1`
   verbose.
 
-> Unit-test, clang-tidy, and sanitizer targets do not exist yet — adding them, plus CI, is
-> [Roadmap](#roadmap) work. Quality-gate policy for all future changes is defined in
+CI-enforced commands (see `.github/workflows/`):
+
+- Warnings-clean build: `CFLAGS="-O2 -Werror" make -C src CC=<gcc|clang>` (env-origin `CFLAGS`
+  is appended to the Makefile's flags, preserving `-isystem uapi/$(PLATFORM)`).
+- **clang-tidy** analysis gate (config in `src/.clang-tidy`): run per file with
+  `clang-tidy <f.c> -- -std=gnu99 -D_GNU_SOURCE -isystem uapi/linux -DRUNSTATEDIR='"/var/run"' -I.`.
+  `clang-analyzer-*` is the anchor and reports zero; `WarningsAsErrors` makes any new finding fail.
+- Fuzz smoke: `CFLAGS="-O1 -g -fsanitize=undefined" make -C src/fuzz`, then each harness for a
+  bounded `-max_total_time`; MSan smoke builds the parser harnesses with `-fsanitize=fuzzer,memory`.
+
+> Unit-test and sanitizer *make targets* do not exist yet (sanitizers run via CI/container
+> commands, not a Makefile target). Quality-gate policy for all changes is defined in
 > `.claude/rules/c.md`.
 
 ---
@@ -179,8 +189,9 @@ The **`src/Makefile` is the authoritative command surface**. Current targets:
 
 Current state — this is what exists today:
 
-- **No unit-test suite yet.** The verification surface is compiler warnings
-  (`-Wall -Wextra`), `make -C src check` (scan-build), and the fuzzers.
+- **No unit-test suite yet.** The verification surface is the warnings-clean build
+  (`-Wall -Wextra -Werror` in CI), the **clang-tidy** analysis gate, informational scan-build,
+  and the fuzzers (built with ASan+UBSan and smoke-run in CI, plus an MSan parser smoke).
 - **Fuzzing**: `src/fuzz/` builds six libFuzzer harnesses with `-fsanitize=fuzzer,address`,
   covering the config-file parser, the `set` CLI grammar, UAPI response parsing, the
   interface-list string handling, and the full command dispatcher. Harnesses `#include` the
@@ -200,25 +211,33 @@ the upstream code style is preserved to keep the fork's diff minimal.
 
 ## Roadmap
 
-Fork work, in order. Nothing below exists yet unless marked otherwise:
+**Delivered**
 
-1. **Sanitizer hardening pass** — build and exercise the codebase under ASan+LSan+UBSan and
-   MSan (separate builds; UBSan extended checks are not enabled on the intentionally-wrapping
-   Curve25519 code), fix EVERY finding at the root cause. No suppressions.
-2. **Test suite** — vendor Unity (MIT, single `.c` + headers) under the test directory and
-   build three tiers: **unit** (table-driven tests for the parsers, encoders, config model,
-   and UAPI protocol code), **integration** (real protocol surfaces against test-owned local
+- **Sanitizer investigation** — the codebase was exercised under ASan+LSan+UBSan and MSan
+  (CLI, config, key, and UAPI-parser workloads) plus the fuzzers: **zero runtime findings,
+  zero fuzzer crashes**. There was no hardening backlog; sanitizer coverage is now enforced in
+  CI (fuzz smoke under ASan+UBSan and an MSan parser smoke) rather than as a one-off pass.
+- **Static-analysis gate** — `src/.clang-tidy` (`clang-analyzer-*` + curated `bugprone-*` /
+  `performance-*` / `portability-*`) at zero findings, `WarningsAsErrors`. scan-build runs
+  informationally in CI (its broader default checkers include noisy ones) and remains the
+  local HTML deep-dive via `make -C src check`.
+- **CI (GitHub Actions)** — `.github/workflows/ci.yml`: warnings-clean build (`gcc`+`clang`
+  on Linux via an `ubuntu:26.04` container, plus native macOS), the clang-tidy gate, and fuzz
+  + MSan smoke — as **independent parallel jobs**. Test-suite jobs are added when the suite lands.
+- **Release automation** — `.github/workflows/release.yml`: `v*` tags build prebuilt tarballs
+  for Linux (amd64 + arm64 cross) and macOS (universal), with `SHA256SUMS`, published to a
+  GitHub release. Versioning: upstream base + fork suffix (e.g. `1.0.20260223+ws1`).
+
+**Planned**
+
+1. **Test suite** — vendor Unity (MIT, single `.c` + headers) under `src/tests/` and build
+   three tiers: **unit** (table-driven tests for the parsers, encoders, config model, and
+   UAPI protocol code), **integration** (real protocol surfaces against test-owned local
    sockets), and **end-to-end** (driving `wg`/`wg-quick` against a real backend, exercising
-   both the kernel netlink path and the userspace UAPI path via the sibling `wireguard-go`);
-   wire `test`/sanitizer targets into the Makefile.
-3. **Static-analysis gate** — a `.clang-tidy` configuration (including `clang-analyzer-*`
-   checks) at zero findings; scan-build retained for HTML deep dives.
-4. **CI (GitHub Actions)** — quality gates on PRs/pushes for **Linux and macOS**, run as
-   **independent parallel jobs** (no serialized dependencies between tiers): warnings-clean
-   build, clang-tidy, unit tests, integration tests, end-to-end tests, sanitizer builds,
-   fuzz smoke. The e2e jobs obtain `wireguard-go` from the sibling fork's **latest GitHub
-   release**; local e2e runs use a locally built `wireguard-go`.
-5. **WebSocket settings support** — surface the sibling `wireguard-go` fork's WebSocket
+   both the kernel netlink path and the userspace UAPI path via the sibling `wireguard-go`).
+   The CI test/e2e jobs and Makefile `test` target land with it; e2e obtains `wireguard-go`
+   from the sibling fork's **latest GitHub release** (local e2e uses a locally built one).
+2. **WebSocket settings support** — surface the sibling `wireguard-go` fork's WebSocket
    transport entirely through configuration files: new `[Interface]`/`[Peer]` keys parsed by
    `wg` and mapped onto the additive UAPI keys (`ws_listen`; per-peer `ws_mode`, `ws_target`,
    `ws_bearer`; `ws(s)://` endpoint URLs), plus daemon-level keys consumed by `wg-quick` and
@@ -227,8 +246,6 @@ Fork work, in order. Nothing below exists yet unless marked otherwise:
    consistent with this repo's env-vars-only-tune-tool-behavior convention). Requires extending the endpoint model beyond `sockaddr`,
    URL-aware show/showconf output, a clean error on kernel backends, man-page and completion
    updates, and fuzz/test coverage.
-6. **Release automation** — tagged releases building prebuilt artifacts for Linux and macOS,
-   published on GitHub releases and via the `danielealbano/homebrew-wireguard` tap (formulas
-   for this fork and the `wireguard-go` fork, using prebuilt binaries). Versioning:
-   upstream base + fork suffix (e.g. `1.0.20260223+ws1`). Debian/Ubuntu packaging is
-   deliberately out of scope for now.
+3. **Homebrew tap** — a `danielealbano/homebrew-wireguard` tap with formulas for this fork
+   and the `wireguard-go` fork, installing the prebuilt release binaries. Debian/Ubuntu
+   packaging is deliberately out of scope for now.
