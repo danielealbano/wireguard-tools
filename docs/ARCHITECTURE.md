@@ -26,9 +26,10 @@ flowchart TD
 - `wg.c` maps the nine subcommands onto six entry points (`addconf`/`syncconf` reuse
   `setconf_main`; `genpsk` reuses `genkey_main`) and defaults bare `wg` to `show`.
 - All configuration state flows through one model: `struct wgdevice` → linked `struct wgpeer`
-  → linked `struct wgallowedip`, with `WGDEVICE_HAS_*`/`WGPEER_*` flag bits recording which
-  fields are present and which semantics apply (`REPLACE_PEERS`, `REPLACE_ALLOWEDIPS`,
-  `REMOVE_ME`). `free_wgdevice()` releases the whole graph.
+  → linked `struct wgallowedip`, with `WGDEVICE_*`/`WGPEER_*`/`WGALLOWEDIP_*` flag bits
+  recording which fields are present (`HAS_*`) and which semantics apply
+  (`WGDEVICE_REPLACE_PEERS`, `WGPEER_REPLACE_ALLOWEDIPS`, `WGPEER_REMOVE_ME`,
+  `WGALLOWEDIP_REMOVE_ME`). `free_wgdevice()` releases the whole graph.
 
 ## 2. Configuration Model
 
@@ -40,8 +41,9 @@ flowchart TD
   `[Peer]`: `Endpoint`, `PublicKey`, `AllowedIPs`, `PersistentKeepalive`, `PresharedKey`.
   Unknown lines are hard errors. `config_read_finish` rejects peers without a public key.
 - **CLI grammar parser** (`config_read_cmd`) for `wg set`: positional word pairs
-  (`listen-port`, `fwmark`, `private-key <file>`, `peer <key>`, `remove`, `endpoint`,
-  `allowed-ips`, `persistent-keepalive`, `preshared-key <file>`). Private and preshared keys
+  (`listen-port`, `fwmark`, `private-key <file>`, `peer <key>`, `endpoint`,
+  `allowed-ips`, `persistent-keepalive`, `preshared-key <file>`) plus the bare `remove`
+  flag on a peer. Private and preshared keys
   arrive as **files** here (the peer public key is inline) so private material never sits in
   `argv`.
 
@@ -91,9 +93,12 @@ flowchart TD
 sequenceDiagram
     participant W as wg (ipc-uapi.h)
     participant D as userspace daemon (e.g. wireguard-go)
+    Note over W,D: every operation opens its own connection and closes it afterwards
     W->>D: connect to RUNSTATEDIR/wireguard/wg0.sock
     W->>D: set=1 with private_key, listen_port, per-peer keys, blank-line terminator
     D-->>W: errno=0 and blank line
+    Note over W,D: connection closed - a later get reconnects
+    W->>D: connect to RUNSTATEDIR/wireguard/wg0.sock
     W->>D: get=1 and blank line
     D-->>W: device + peer key/value lines, errno=0, blank line
     Note over W: derives device public key locally<br/>from private_key via Curve25519
