@@ -61,7 +61,7 @@ flowchart LR
 | Static analysis | **scan-build** (`make check`) | Clang Static Analyzer over the full build. clang-tidy gate: see [Roadmap](#roadmap). |
 | Fuzzing | **libFuzzer + ASan** (`src/fuzz/`) | Six harnesses: `config`, `uapi`, `stringlist`, `cmd`, `set`, `setconf`; clang required. |
 | Unit tests | **Unity** (vendored) — planned | Lands with the fork's test-suite pass; see [Roadmap](#roadmap) and `.claude/rules/c.md`. |
-| Versioning | `git describe` → `WIREGUARD_TOOLS_VERSION` | Injected by the Makefile; `version.h` fallback for Windows resources. |
+| Versioning | `git describe` → `WIREGUARD_TOOLS_VERSION` | Injected by the Makefile from `git describe`; `version.h` provides the fallback version string and is the sole source for the Windows resource version. |
 
 ---
 

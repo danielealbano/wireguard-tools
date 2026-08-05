@@ -152,7 +152,7 @@ static void test_config_parse_port_variants(void)
 ### Definition of Done
 A change MUST be considered DONE **ONLY AND ONLY** if ALL are true:
 
-- All relevant automated tests are written AND passing (unit, integration, fuzz smoke as appropriate).
+- All relevant automated tests are written AND passing (unit, integration, e2e, fuzz smoke as appropriate).
 - **ZERO compiler warnings** with the project's warning flags, on EVERY supported platform target the change touches.
 - **ZERO clang-tidy findings** (including the `clang-analyzer-*` checks) per the project's configuration.
 - The sanitizer gate (ASan+LSan+UBSan and MSan builds) passes on the full test suite.
