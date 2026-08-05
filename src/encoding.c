@@ -37,13 +37,13 @@ static inline int decode_base64(const char src[static 4])
 	int val = 0;
 
 	for (unsigned int i = 0; i < 4; ++i)
-		val |= (-1
+		val |= (int)((uint32_t)(-1
 			    + ((((('A' - 1) - src[i]) & (src[i] - ('Z' + 1))) >> 8) & (src[i] - 64))
 			    + ((((('a' - 1) - src[i]) & (src[i] - ('z' + 1))) >> 8) & (src[i] - 70))
 			    + ((((('0' - 1) - src[i]) & (src[i] - ('9' + 1))) >> 8) & (src[i] + 5))
 			    + ((((('+' - 1) - src[i]) & (src[i] - ('+' + 1))) >> 8) & 63)
 			    + ((((('/' - 1) - src[i]) & (src[i] - ('/' + 1))) >> 8) & 64)
-			) << (18 - 6 * i);
+			) << (18 - 6 * i));
 	return val;
 }
 
