@@ -36,7 +36,7 @@ static void filter_ansi(const char *fmt, va_list args)
 	size_t len, i, j;
 
 	if (color_mode()) {
-		vfprintf(stdout, fmt, args);
+		(void) vfprintf(stdout, fmt, args);
 		return;
 	}
 
@@ -56,7 +56,7 @@ static void filter_ansi(const char *fmt, va_list args)
 		}
 	}
 	for (i = 0; i < len; i = j) {
-		fputs(&str[i], stdout);
+		(void) fputs(&str[i], stdout);
 		for (j = i + strlen(&str[i]); j < len; ++j) {
 			if (str[j] != '\0')
 				break;

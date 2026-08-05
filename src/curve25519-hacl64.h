@@ -744,7 +744,7 @@ static __always_inline void format_scalar_of_point(u8 *scalar, u64 *point)
 {
 	u64 *x = point;
 	u64 *z = point + 5;
-	u64 buf[10] __aligned(32) = { 0 };
+	u64 buf[10] wg_aligned(32) = { 0 };
 	u64 *zmone = buf;
 	u64 *sc = buf + 5;
 	crecip(zmone, z);
@@ -756,7 +756,7 @@ static void curve25519_generic(u8 mypublic[CURVE25519_KEY_SIZE],
 			       const u8 secret[CURVE25519_KEY_SIZE],
 			       const u8 basepoint[CURVE25519_KEY_SIZE])
 {
-	u64 buf0[10] __aligned(32) = { 0 };
+	u64 buf0[10] wg_aligned(32) = { 0 };
 	u64 *x0 = buf0;
 	u64 *z = buf0 + 5;
 	u64 *q;
@@ -764,7 +764,7 @@ static void curve25519_generic(u8 mypublic[CURVE25519_KEY_SIZE],
 	z[0] = 1;
 	q = buf0;
 	{
-		u8 e[32] __aligned(32) = { 0 };
+		u8 e[32] wg_aligned(32) = { 0 };
 		u8 *scalar;
 		memcpy(e, secret, 32);
 		curve25519_clamp_secret(e);

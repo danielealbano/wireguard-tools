@@ -77,7 +77,7 @@ static bool sync_conf(struct wgdevice *file)
 	for (i = 0; i < peer_count; ++i) {
 		if (peers[i].from_file)
 			continue;
-		if (i == peer_count - 1 || !peers[i + 1].from_file || memcmp(peers[i].peer->public_key, peers[i + 1].peer->public_key, WG_KEY_LEN)) {
+		if (i == peer_count - 1 || !peers[i + 1].from_file || memcmp(peers[i].peer->public_key, peers[i + 1].peer->public_key, WG_KEY_LEN) != 0) {
 			peer = calloc(1, sizeof(struct wgpeer));
 			if (!peer) {
 				free_wgdevice(runtime);
@@ -123,7 +123,7 @@ int setconf_main(int argc, const char *argv[])
 	int ret = 1;
 
 	if (argc != 3) {
-		fprintf(stderr, "Usage: %s %s <interface> <configuration filename>\n", PROG_NAME, argv[0]);
+		(void) fprintf(stderr, "Usage: %s %s <interface> <configuration filename>\n", PROG_NAME, argv[0]);
 		return 1;
 	}
 
@@ -133,18 +133,18 @@ int setconf_main(int argc, const char *argv[])
 		return 1;
 	}
 	if (!config_read_init(&ctx, !strcmp(argv[0], "addconf"))) {
-		fclose(config_input);
+		(void) fclose(config_input);
 		return 1;
 	}
 	while (getline(&config_buffer, &config_buffer_len, config_input) >= 0) {
 		if (!config_read_line(&ctx, config_buffer)) {
-			fprintf(stderr, "Configuration parsing error\n");
+			(void) fprintf(stderr, "Configuration parsing error\n");
 			goto cleanup;
 		}
 	}
 	device = config_read_finish(&ctx);
 	if (!device) {
-		fprintf(stderr, "Invalid configuration\n");
+		(void) fprintf(stderr, "Invalid configuration\n");
 		goto cleanup;
 	}
 	strncpy(device->name, argv[1], IFNAMSIZ - 1);
@@ -164,7 +164,7 @@ int setconf_main(int argc, const char *argv[])
 
 cleanup:
 	if (config_input)
-		fclose(config_input);
+		(void) fclose(config_input);
 	free(config_buffer);
 	free_wgdevice(device);
 	return ret;

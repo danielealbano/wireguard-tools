@@ -28,7 +28,7 @@ int showconf_main(int argc, const char *argv[])
 	int ret = 1;
 
 	if (argc != 2) {
-		fprintf(stderr, "Usage: %s %s <interface>\n", PROG_NAME, argv[0]);
+		(void) fprintf(stderr, "Usage: %s %s <interface>\n", PROG_NAME, argv[0]);
 		return 1;
 	}
 

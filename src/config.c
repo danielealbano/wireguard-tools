@@ -30,7 +30,7 @@ static const char *get_value(const char *line, const char *key)
 	if (keylen >= linelen)
 		return NULL;
 
-	if (strncasecmp(line, key, keylen))
+	if (strncasecmp(line, key, keylen) != 0)
 		return NULL;
 
 	return line + keylen;
@@ -48,13 +48,13 @@ static inline bool parse_port(uint16_t *port, uint32_t *flags, const char *value
 	};
 
 	if (!strlen(value)) {
-		fprintf(stderr, "Unable to parse empty port\n");
+		(void) fprintf(stderr, "Unable to parse empty port\n");
 		return false;
 	}
 
 	ret = getaddrinfo(NULL, value, &hints, &resolved);
 	if (ret) {
-		fprintf(stderr, "%s: `%s'\n", ret == EAI_SYSTEM ? strerror(errno) : gai_strerror(ret), value);
+		(void) fprintf(stderr, "%s: `%s'\n", ret == EAI_SYSTEM ? strerror(errno) : gai_strerror(ret), value);
 		return false;
 	}
 
@@ -66,7 +66,7 @@ static inline bool parse_port(uint16_t *port, uint32_t *flags, const char *value
 		*port = ntohs(((struct sockaddr_in6 *)resolved->ai_addr)->sin6_port);
 		ret = 0;
 	} else
-		fprintf(stderr, "Neither IPv4 nor IPv6 address found: `%s'\n", value);
+		(void) fprintf(stderr, "Neither IPv4 nor IPv6 address found: `%s'\n", value);
 
 	freeaddrinfo(resolved);
 	if (!ret)
@@ -74,6 +74,8 @@ static inline bool parse_port(uint16_t *port, uint32_t *flags, const char *value
 	return ret == 0;
 }
 
+/* fwmark and flags are distinct out-params by role; a wrapper type is not worth the churn. */
+/* NOLINTNEXTLINE(bugprone-easily-swappable-parameters) */
 static inline bool parse_fwmark(uint32_t *fwmark, uint32_t *flags, const char *value)
 {
 	unsigned long ret;
@@ -107,7 +109,7 @@ err:
 static inline bool parse_key(uint8_t key[static WG_KEY_LEN], const char *value)
 {
 	if (!key_from_base64(key, value)) {
-		fprintf(stderr, "Key is not the correct length or format: `%s'\n", value);
+		(void) fprintf(stderr, "Key is not the correct length or format: `%s'\n", value);
 		memset(key, 0, WG_KEY_LEN);
 		return false;
 	}
@@ -135,14 +137,14 @@ static bool parse_keyfile(uint8_t key[static WG_KEY_LEN], const char *path)
 			goto out;
 		}
 
-		fprintf(stderr, "Invalid length key in key file\n");
+		(void) fprintf(stderr, "Invalid length key in key file\n");
 		goto out;
 	}
 	dst[WG_KEY_LEN_BASE64 - 1] = '\0';
 
 	while ((c = getc(f)) != EOF) {
 		if (!char_is_space(c)) {
-			fprintf(stderr, "Found trailing character in key file: `%c'\n", c);
+			(void) fprintf(stderr, "Found trailing character in key file: `%c'\n", c);
 			goto out;
 		}
 	}
@@ -168,7 +170,7 @@ static inline bool parse_ip(struct wgallowedip *allowedip, const char *value)
 			allowedip->family = AF_INET;
 	}
 	if (allowedip->family == AF_UNSPEC) {
-		fprintf(stderr, "Unable to parse IP address: `%s'\n", value);
+		(void) fprintf(stderr, "Unable to parse IP address: `%s'\n", value);
 		return false;
 	}
 	return true;
@@ -186,7 +188,7 @@ static inline int parse_dns_retries(void)
 
 	ret = strtoul(retries, &end, 10);
 	if (*end || ret > INT_MAX) {
-		fprintf(stderr, "Unable to parse WG_ENDPOINT_RESOLUTION_RETRIES: `%s'\n", retries);
+		(void) fprintf(stderr, "Unable to parse WG_ENDPOINT_RESOLUTION_RETRIES: `%s'\n", retries);
 		exit(1);
 	}
 	return (int)ret;
@@ -196,6 +198,8 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 {
 	char *mutable = strdup(value);
 	char *begin, *end;
+	char sep;
+	bool last_try;
 	int ret, retries = parse_dns_retries();
 	struct addrinfo *resolved;
 	struct addrinfo hints = {
@@ -209,7 +213,7 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 	}
 	if (!strlen(value)) {
 		free(mutable);
-		fprintf(stderr, "Unable to parse empty endpoint\n");
+		(void) fprintf(stderr, "Unable to parse empty endpoint\n");
 		return false;
 	}
 	if (mutable[0] == '[') {
@@ -217,13 +221,15 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 		end = strchr(mutable, ']');
 		if (!end) {
 			free(mutable);
-			fprintf(stderr, "Unable to find matching brace of endpoint: `%s'\n", value);
+			(void) fprintf(stderr, "Unable to find matching brace of endpoint: `%s'\n", value);
 			return false;
 		}
 		*end++ = '\0';
-		if (*end++ != ':' || !*end) {
+		sep = *end;
+		++end;
+		if (sep != ':' || !*end) {
 			free(mutable);
-			fprintf(stderr, "Unable to find port of endpoint: `%s'\n", value);
+			(void) fprintf(stderr, "Unable to find port of endpoint: `%s'\n", value);
 			return false;
 		}
 	} else {
@@ -231,7 +237,7 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 		end = strrchr(mutable, ':');
 		if (!end || !*(end + 1)) {
 			free(mutable);
-			fprintf(stderr, "Unable to find port of endpoint: `%s'\n", value);
+			(void) fprintf(stderr, "Unable to find port of endpoint: `%s'\n", value);
 			return false;
 		}
 		*end++ = '\0';
@@ -252,16 +258,19 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 		 *
 		 * So this is what we do, except FreeBSD removed EAI_NODATA some time ago, so that's conditional.
 		 */
+		last_try = (retries == 0);
+		if (retries >= 0)
+			--retries;
 		if (ret == EAI_NONAME || ret == EAI_FAIL ||
 			#ifdef EAI_NODATA
 				ret == EAI_NODATA ||
 			#endif
-				(retries >= 0 && !retries--)) {
+				last_try) {
 			free(mutable);
-			fprintf(stderr, "%s: `%s'\n", ret == EAI_SYSTEM ? strerror(errno) : gai_strerror(ret), value);
+			(void) fprintf(stderr, "%s: `%s'\n", ret == EAI_SYSTEM ? strerror(errno) : gai_strerror(ret), value);
 			return false;
 		}
-		fprintf(stderr, "%s: `%s'. Trying again in %.2f seconds...\n", ret == EAI_SYSTEM ? strerror(errno) : gai_strerror(ret), value, timeout / 1000000.0);
+		(void) fprintf(stderr, "%s: `%s'. Trying again in %.2f seconds...\n", ret == EAI_SYSTEM ? strerror(errno) : gai_strerror(ret), value, timeout / 1000000.0);
 		usleep(timeout);
 	}
 
@@ -271,7 +280,7 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 	else {
 		freeaddrinfo(resolved);
 		free(mutable);
-		fprintf(stderr, "Neither IPv4 nor IPv6 address found: `%s'\n", value);
+		(void) fprintf(stderr, "Neither IPv4 nor IPv6 address found: `%s'\n", value);
 		return false;
 	}
 	freeaddrinfo(resolved);
@@ -348,6 +357,9 @@ static inline void parse_ip_prefix(struct wgpeer *peer, uint32_t *flags, char **
 	case '+':
 		peer->flags &= ~WGPEER_REPLACE_ALLOWEDIPS;
 		++(*mask);
+		break;
+	default:
+		break;
 	}
 }
 
@@ -412,7 +424,7 @@ static inline bool parse_allowedips(struct wgpeer *peer, struct wgallowedip **la
 		new_allowedip->flags = flags;
 
 		if (!validate_netmask(new_allowedip))
-			fprintf(stderr, "Warning: AllowedIP has nonzero host part: %s/%s\n", ip, mask);
+			(void) fprintf(stderr, "Warning: AllowedIP has nonzero host part: %s/%s\n", ip, mask);
 
 		if (allowedip)
 			allowedip->next_allowedip = new_allowedip;
@@ -428,7 +440,7 @@ static inline bool parse_allowedips(struct wgpeer *peer, struct wgallowedip **la
 err:
 	free(new_allowedip);
 	free(mutable);
-	fprintf(stderr, "AllowedIP is not in the correct format: `%s'\n", saved_entry);
+	(void) fprintf(stderr, "AllowedIP is not in the correct format: `%s'\n", saved_entry);
 	free(saved_entry);
 	return false;
 }
@@ -464,6 +476,10 @@ static bool process_line(struct config_ctx *ctx, const char *line)
 
 #define key_match(key) (value = get_value(line, key "="))
 
+	/* key_match() is an intentional assign-and-test idiom driving the
+	 * section/key dispatch. A table-driven refactor is deferred until the
+	 * unit-test suite exists to guard this parser (see docs/PROJECT.md). */
+	/* NOLINTBEGIN(bugprone-assignment-in-if-condition) */
 	if (ctx->is_device_section) {
 		if (key_match("ListenPort"))
 			ret = parse_port(&ctx->device->listen_port, &ctx->device->flags, value);
@@ -494,6 +510,7 @@ static bool process_line(struct config_ctx *ctx, const char *line)
 			goto error;
 	} else
 		goto error;
+	/* NOLINTEND(bugprone-assignment-in-if-condition) */
 	return ret;
 
 #undef key_match
@@ -557,7 +574,7 @@ struct wgdevice *config_read_finish(struct config_ctx *ctx)
 
 	for_each_wgpeer(ctx->device, peer) {
 		if (!(peer->flags & WGPEER_HAS_PUBLIC_KEY)) {
-			fprintf(stderr, "A peer is missing a public key\n");
+			(void) fprintf(stderr, "A peer is missing a public key\n");
 			goto err;
 		}
 	}
@@ -663,7 +680,7 @@ struct wgdevice *config_read_cmd(const char *argv[], int argc)
 			argv += 2;
 			argc -= 2;
 		} else {
-			fprintf(stderr, "Invalid argument: %s\n", argv[0]);
+			(void) fprintf(stderr, "Invalid argument: %s\n", argv[0]);
 			goto error;
 		}
 	}

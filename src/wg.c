@@ -30,11 +30,11 @@ static const struct {
 
 static void show_usage(FILE *file)
 {
-	fprintf(file, "Usage: %s <cmd> [<args>]\n\n", PROG_NAME);
-	fprintf(file, "Available subcommands:\n");
+	(void) fprintf(file, "Usage: %s <cmd> [<args>]\n\n", PROG_NAME);
+	(void) fprintf(file, "Available subcommands:\n");
 	for (size_t i = 0; i < sizeof(subcommands) / sizeof(subcommands[0]); ++i)
-		fprintf(file, "  %s: %s\n", subcommands[i].subcommand, subcommands[i].description);
-	fprintf(file, "You may pass `--help' to any of these subcommands to view usage.\n");
+		(void) fprintf(file, "  %s: %s\n", subcommands[i].subcommand, subcommands[i].description);
+	(void) fprintf(file, "You may pass `--help' to any of these subcommands to view usage.\n");
 }
 
 int main(int argc, const char *argv[])
@@ -60,7 +60,7 @@ int main(int argc, const char *argv[])
 			return subcommands[i].function(argc - 1, argv + 1);
 	}
 
-	fprintf(stderr, "Invalid subcommand: `%s'\n", argv[1]);
+	(void) fprintf(stderr, "Invalid subcommand: `%s'\n", argv[1]);
 	show_usage(stderr);
 	return 1;
 }
