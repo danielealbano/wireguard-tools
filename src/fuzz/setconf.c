@@ -46,6 +46,12 @@ int LLVMFuzzerTestOneInput(const char *data, size_t data_len)
 	char strptr[32];
 	char *argv[3] = { "setconf", "wg0", strptr };
 	struct hacked_pointers h = { data, data_len };
+	static FILE *devnull;
+
+	if (!devnull) {
+		assert((devnull = fopen("/dev/null", "r+")));
+		stdout = stderr = devnull;
+	}
 
 	snprintf(strptr, sizeof(strptr), "%lu", (unsigned long)&h);
 	setconf_main(3, argv);
