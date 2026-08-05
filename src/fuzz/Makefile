@@ -6,8 +6,12 @@ FUZZERS := config uapi stringlist cmd set setconf
 
 all: $(FUZZERS)
 
+PLATFORM ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
 CFLAGS ?= -O3 -march=native -g
-CFLAGS += -fsanitize=fuzzer -fsanitize=address -std=gnu11 -idirafter ../uapi -D_GNU_SOURCE
+CFLAGS += -fsanitize=fuzzer -fsanitize=address -std=gnu11 -D_GNU_SOURCE
+ifneq ($(wildcard ../uapi/$(PLATFORM)/.),)
+CFLAGS += -isystem ../uapi/$(PLATFORM)
+endif
 CC := clang
 
 config: config.c ../config.c ../encoding.c
