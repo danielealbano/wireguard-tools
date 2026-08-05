@@ -73,8 +73,9 @@ Authoritative detail lives in `docs/PROJECT.md`.
   openbsd, and windows building; per-platform variants (ipc backends, wg-quick scripts) MUST
   stay consistent when shared behavior changes.
 - **SECRETS HYGIENE.** Keys are printed ONLY where that is the documented purpose (genkey,
-  showconf, `WG_HIDE_KEYS=never`); never in diagnostics. Key files use umask-077 patterns.
-  Constant-time primitives MUST NOT be weakened.
+  showconf, `WG_HIDE_KEYS=never`); diagnostics MUST NOT echo valid key material (for the
+  precise current behavior on malformed input, see `docs/ARCHITECTURE.md` §8). Key files use
+  umask-077 patterns. Constant-time primitives MUST NOT be weakened.
 - **MINIMAL UPSTREAM DIFF.** No reformatting, no drive-by refactors of upstream code; match
   the existing style so future upstream rebases stay tractable.
 - **SINGLE-THREADED BY DESIGN.** `wg` has no threads, signals, or event loops; do not
@@ -156,9 +157,9 @@ Mermaid validation per `development_pipeline.md` §9 whenever docs charts are to
   allowed there, never in the default run), per `c.md` §3.
 - **Every parser MUST have fuzz coverage** — extend `src/fuzz/` in the same change.
 - **Sanitizers are mandatory** on the test suite: ASan+LSan+UBSan build and a separate MSan
-  build. On macOS hosts, sanitizer jobs run in Linux containers (Docker); CI runs them on
-  Linux runners. UBSan extended integer checks are NOT enabled on the vendored Curve25519
-  code (intentional unsigned wraparound).
+  build. On macOS hosts, the Linux-only sanitizers run in Linux containers (Docker); CI runs
+  the sanitizer jobs on Linux runners. UBSan extended integer checks are NOT enabled on the
+  vendored Curve25519 code (intentional unsigned wraparound).
 - **Testcontainers are NOT used** — no external service infrastructure exists. This is the
   documented exception to the generic testing rules.
 

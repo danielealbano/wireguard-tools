@@ -128,7 +128,7 @@ configuration file / CLI arguments.
 
 ### IPC backends
 
-`wg` talks to whichever implementation owns the interface (see `docs/ARCHITECTURE.md` §4):
+`wg` talks to whichever implementation owns the interface (see `docs/ARCHITECTURE.md` §3):
 
 - **Userspace (all platforms)** — the cross-platform
   [UAPI text protocol](https://www.wireguard.com/xplatform/#configuration-protocol)
@@ -188,8 +188,9 @@ Current state — this is what exists today:
   sockets. Testcontainers do not apply.
 
 Decided direction (see [Roadmap](#roadmap) and `.claude/rules/c.md`): a vendored **Unity**
-unit-test suite, a mandatory **ASan+LSan+UBSan / MSan** sanitizer gate (run in Linux
-containers on macOS hosts), fuzz coverage required for every parser, and a **clang-tidy**
+unit-test suite, a mandatory **ASan+LSan+UBSan / MSan** sanitizer gate (Linux-only
+sanitizers run in Linux containers on macOS hosts; CI runs the sanitizer jobs on Linux
+runners), fuzz coverage required for every parser, and a **clang-tidy**
 (including `clang-analyzer-*`) zero-findings policy. clang-format is deliberately NOT used —
 the upstream code style is preserved to keep the fork's diff minimal.
 

@@ -47,7 +47,7 @@ flowchart TD
 Parsing details that matter:
 
 - `Endpoint` accepts `host:port` and `[v6]:port`, resolved via `getaddrinfo` with a retry
-  loop (default 15 attempts, `WG_ENDPOINT_RESOLUTION_RETRIES`, `infinity` supported;
+  loop (default 15 retries, `WG_ENDPOINT_RESOLUTION_RETRIES`, `infinity` supported;
   permanent DNS failures abort immediately). The result is stored as a raw
   `sockaddr_in`/`sockaddr_in6` union in the peer — the model has no textual endpoint today
   (the WebSocket roadmap item extends exactly this point).
