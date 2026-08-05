@@ -79,12 +79,12 @@ int genkey_main(int argc, const char *argv[])
 	struct stat stat;
 
 	if (argc != 1) {
-		fprintf(stderr, "Usage: %s %s\n", PROG_NAME, argv[0]);
+		(void) fprintf(stderr, "Usage: %s %s\n", PROG_NAME, argv[0]);
 		return 1;
 	}
 
 	if (!fstat(STDOUT_FILENO, &stat) && S_ISREG(stat.st_mode) && stat.st_mode & S_IRWXO)
-		fputs("Warning: writing to world accessible file.\nConsider setting the umask to 077 and trying again.\n", stderr);
+		(void) fputs("Warning: writing to world accessible file.\nConsider setting the umask to 077 and trying again.\n", stderr);
 
 	if (!get_random_bytes(key, WG_KEY_LEN)) {
 		perror("getrandom");

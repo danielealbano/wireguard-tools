@@ -122,7 +122,7 @@ static char *endpoint(const struct sockaddr *addr)
 		strncpy(buf, gai_strerror(ret), sizeof(buf) - 1);
 		buf[sizeof(buf) - 1] = '\0';
 	} else
-		snprintf(buf, sizeof(buf), (addr->sa_family == AF_INET6 && strchr(host, ':')) ? "[%s]:%s" : "%s:%s", host, service);
+		(void) snprintf(buf, sizeof(buf), (addr->sa_family == AF_INET6 && strchr(host, ':')) ? "[%s]:%s" : "%s:%s", host, service);
 	return buf;
 }
 
@@ -186,15 +186,15 @@ static char *bytes(uint64_t b)
 	static char buf[1024];
 
 	if (b < 1024ULL)
-		snprintf(buf, sizeof(buf), "%u " TERMINAL_FG_CYAN "B" TERMINAL_RESET, (unsigned int)b);
+		(void) snprintf(buf, sizeof(buf), "%u " TERMINAL_FG_CYAN "B" TERMINAL_RESET, (unsigned int)b);
 	else if (b < 1024ULL * 1024ULL)
-		snprintf(buf, sizeof(buf), "%.2f " TERMINAL_FG_CYAN "KiB" TERMINAL_RESET, (double)b / 1024);
+		(void) snprintf(buf, sizeof(buf), "%.2f " TERMINAL_FG_CYAN "KiB" TERMINAL_RESET, (double)b / 1024);
 	else if (b < 1024ULL * 1024ULL * 1024ULL)
-		snprintf(buf, sizeof(buf), "%.2f " TERMINAL_FG_CYAN "MiB" TERMINAL_RESET, (double)b / (1024 * 1024));
+		(void) snprintf(buf, sizeof(buf), "%.2f " TERMINAL_FG_CYAN "MiB" TERMINAL_RESET, (double)b / (1024 * 1024));
 	else if (b < 1024ULL * 1024ULL * 1024ULL * 1024ULL)
-		snprintf(buf, sizeof(buf), "%.2f " TERMINAL_FG_CYAN "GiB" TERMINAL_RESET, (double)b / (1024 * 1024 * 1024));
+		(void) snprintf(buf, sizeof(buf), "%.2f " TERMINAL_FG_CYAN "GiB" TERMINAL_RESET, (double)b / (1024 * 1024 * 1024));
 	else
-		snprintf(buf, sizeof(buf), "%.2f " TERMINAL_FG_CYAN "TiB" TERMINAL_RESET, (double)b / (1024 * 1024 * 1024) / 1024);
+		(void) snprintf(buf, sizeof(buf), "%.2f " TERMINAL_FG_CYAN "TiB" TERMINAL_RESET, (double)b / (1024 * 1024 * 1024) / 1024);
 
 	return buf;
 }
@@ -202,7 +202,7 @@ static char *bytes(uint64_t b)
 static const char *COMMAND_NAME;
 static void show_usage(void)
 {
-	fprintf(stderr, "Usage: %s %s { <interface> | all | interfaces } [public-key | private-key | listen-port | fwmark | peers | preshared-keys | endpoints | allowed-ips | latest-handshakes | transfer | persistent-keepalive | dump]\n", PROG_NAME, COMMAND_NAME);
+	(void) fprintf(stderr, "Usage: %s %s { <interface> | all | interfaces } [public-key | private-key | listen-port | fwmark | peers | preshared-keys | endpoints | allowed-ips | latest-handshakes | transfer | persistent-keepalive | dump]\n", PROG_NAME, COMMAND_NAME);
 }
 
 static void pretty_print(struct wgdevice *device)
@@ -369,7 +369,7 @@ static bool ugly_print(struct wgdevice *device, const char *param, bool with_int
 	} else if (!strcmp(param, "dump"))
 		dump_print(device, with_interface);
 	else {
-		fprintf(stderr, "Invalid parameter: `%s'\n", param);
+		(void) fprintf(stderr, "Invalid parameter: `%s'\n", param);
 		show_usage();
 		return false;
 	}
@@ -400,7 +400,7 @@ int show_main(int argc, const char *argv[])
 			struct wgdevice *device = NULL;
 
 			if (ipc_get_device(&device, interface) < 0) {
-				fprintf(stderr, "Unable to access interface %s: %s\n", interface, strerror(errno));
+				(void) fprintf(stderr, "Unable to access interface %s: %s\n", interface, strerror(errno));
 				continue;
 			}
 			if (argc == 3) {
