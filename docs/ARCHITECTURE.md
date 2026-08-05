@@ -143,8 +143,9 @@ flowchart TD
   `curve25519-fiat32.h` and `curve25519-hacl64.h`, selected at compile time by 128-bit
   integer compiler support (`__SIZEOF_INT128__`).
 - **Randomness**: `getentropy` (OpenBSD / macOS 10.12+ / glibc ≥ 2.25) → `getrandom` syscall (Linux) →
-  `/dev/urandom` read loop; Windows uses `RtlGenRandom`. Key generation refuses requests
-  larger than 256 bytes and warns when stdout is a world-accessible regular file.
+  `/dev/urandom` read loop; Windows uses `RtlGenRandom`. The POSIX wrapper refuses requests
+  larger than 256 bytes (keys are 32); `genkey` warns when stdout is a world-accessible
+  regular file.
 - **Constant-time helpers**: `encoding.c` (base64/hex, branchless validity accumulation),
   `ctype.h` (locale-independent, constant-time character classes), `key_is_zero`.
   These MUST NOT be replaced with variable-time equivalents.
