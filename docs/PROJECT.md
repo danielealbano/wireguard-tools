@@ -56,7 +56,7 @@ flowchart LR
 | Crypto | in-repo **Curve25519** | `curve25519-fiat32.h` (32-bit) / `curve25519-hacl64.h` (64-bit) backends; used only for public-key derivation and key clamping. |
 | Encoding | in-repo base64/hex (`encoding.c`) | Constant-time conversions; constant-time `ctype.h` replacements. |
 | Netlink | in-repo **mini-libmnl** (`netlink.h`, LGPL-2.1+) | Vendored, minimized libmnl; no external libmnl dependency. |
-| Kernel UAPI headers | `src/uapi/<os>/` | Fallback `linux/wireguard.h`, `dev/wg/if_wg.h`, `net/if_wg.h` copies per OS. |
+| Kernel UAPI headers | `src/uapi/<os>/` | Fallback copies per OS: `linux/wireguard.h`, `dev/wg/if_wg.h`, `net/if_wg.h`, and `wireguard.h` (WireGuardNT). |
 | Windows | **llvm-mingw** (`x86_64-w64-mingw32-clang`) | `src/wincompat/` shims, delay-loaded DLLs, Windows ≥ 10. |
 | Static analysis | **scan-build** (`make check`) | Clang Static Analyzer over the full build. clang-tidy gate: see [Roadmap](#roadmap). |
 | Fuzzing | **libFuzzer + ASan** (`src/fuzz/`) | Six harnesses: `config`, `uapi`, `stringlist`, `cmd`, `set`, `setconf`; clang required. |
@@ -219,7 +219,9 @@ Fork work, in order. Nothing below exists yet unless marked otherwise:
    transport entirely through configuration files: new `[Interface]`/`[Peer]` keys parsed by
    `wg` and mapped onto the additive UAPI keys (`ws_listen`; per-peer `ws_mode`, `ws_target`,
    `ws_bearer`; `ws(s)://` endpoint URLs), plus daemon-level keys consumed by `wg-quick` and
-   handed to the daemon at launch. Requires extending the endpoint model beyond `sockaddr`,
+   handed to the daemon at launch via the sibling fork's `WG_TRANSPORT`/`WG_WS_*` bootstrap
+   environment variables (daemon-side variables of `wireguard-go`, invisible to end users —
+   consistent with this repo's env-vars-only-tune-tool-behavior convention). Requires extending the endpoint model beyond `sockaddr`,
    URL-aware show/showconf output, a clean error on kernel backends, man-page and completion
    updates, and fuzz/test coverage.
 6. **Release automation** — tagged releases building prebuilt artifacts for Linux and macOS,

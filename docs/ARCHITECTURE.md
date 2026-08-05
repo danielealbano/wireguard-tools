@@ -168,10 +168,10 @@ platform variant consistent.
 
 - **Secrets discipline**: `wg show` hides private/preshared keys unless `WG_HIDE_KEYS=never`;
   keys are read from files (not argv) in `wg set`; key files created by `wg-quick save` use
-  umask 077 with atomic replace; `genkey` warns on world-accessible stdout; key-file and
-  `pubkey` stdin parse errors never echo content (inline config-file key values are quoted
-  in parse errors like any other value); `wg-quick` warns when the config file is
-  world-accessible.
+  umask 077 with atomic replace; `genkey` warns on world-accessible stdout; key-length
+  failures and `pubkey` stdin errors never echo content, while base64-format failures quote
+  the offending value (including key-file contents) like any other parse error; `wg-quick`
+  warns when the config file is world-accessible.
 - **Input distrust**: every UAPI response byte, config line, and CLI argument is validated
   and bounded; the interface name is checked against path traversal (`/` rejected) before
   socket path construction; Windows verifies pipe ownership before speaking.

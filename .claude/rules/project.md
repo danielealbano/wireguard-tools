@@ -46,7 +46,7 @@ Authoritative detail lives in `docs/PROJECT.md`.
 | Crypto | in-repo Curve25519 (fiat32 / hacl64) | Key derivation + clamping only. Constant-time encoders in `encoding.c`/`ctype.h`. |
 | Netlink | vendored mini-libmnl (`src/netlink.h`) | No external libmnl. |
 | Static analysis | scan-build (`make -C src check`) | clang-tidy (incl. `clang-analyzer-*`) gate is roadmap work; clang-format is deliberately NOT used. |
-| Fuzzing | libFuzzer + ASan (`src/fuzz/`, clang) | Six harnesses covering all parsers. |
+| Fuzzing | libFuzzer + ASan (`src/fuzz/`, clang) | Six harnesses: config/CLI parsers, UAPI response parsing, interface-list handling, command dispatch. |
 | Unit tests | **Unity**, vendored (planned) | Lands with the fork's test-suite pass; policy in `c.md` §3. |
 | Windows | llvm-mingw + `src/wincompat/` | Windows ≥ 10. |
 | Versioning | `git describe` → `WIREGUARD_TOOLS_VERSION` | Fork releases: upstream base + suffix (e.g. `1.0.20260223+ws1`). |
