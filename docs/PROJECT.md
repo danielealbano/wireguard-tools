@@ -96,8 +96,8 @@ flowchart LR
 `private-key <file>`, `peer <key>` with `remove`, `preshared-key <file>`, `endpoint`,
 `persistent-keepalive`, `allowed-ips`). `wg setconf|addconf|syncconf <iface> <file>` apply a
 config file (replace / append / minimal-diff sync). `genkey`/`genpsk` write a fresh key to
-stdout (warning if the destination is world-accessible); `pubkey` derives the public key on a
-stdin→stdout pipe.
+stdout (warning if the destination is a world-accessible regular file); `pubkey` derives the
+public key on a stdin→stdout pipe.
 
 ### Configuration file format
 

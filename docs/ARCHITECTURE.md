@@ -126,11 +126,11 @@ flowchart TD
 ```
 
 - `down` reverses: hooks, optional `SaveConfig` re-export (umask 077, write-temp-then-rename),
-  DNS/firewall teardown, policy-rule cleanup, link deletion.
+  policy-rule cleanup and link deletion, then DNS/firewall teardown.
 - Platform variants: **darwin** launches the userspace daemon against `utun`, resolves the real
   interface name via `WG_TUN_NAME_FILE`/`/var/run/wireguard/<iface>.name`, manages DNS with
-  `networksetup`, and keeps a background `route -n monitor` daemon to re-apply
-  addresses/routes/DNS on network changes; **freebsd/openbsd** use their `ifconfig`/route
+  `networksetup`, and keeps a background `route -n monitor` daemon to re-apply endpoint
+  routes, auto-discovered MTU, and DNS on network changes; **freebsd/openbsd** use their `ifconfig`/route
   idioms; **android** is a separate C program (`android.c`) integrating with Android's
   networking. The systemd unit runs `wg-quick up %i` with
   `WG_ENDPOINT_RESOLUTION_RETRIES=infinity`; `ExecReload` uses `wg syncconf` with
