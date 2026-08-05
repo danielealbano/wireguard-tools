@@ -41,8 +41,9 @@ flowchart TD
   Unknown lines are hard errors. `config_read_finish` rejects peers without a public key.
 - **CLI grammar parser** (`config_read_cmd`) for `wg set`: positional word pairs
   (`listen-port`, `fwmark`, `private-key <file>`, `peer <key>`, `remove`, `endpoint`,
-  `allowed-ips`, `persistent-keepalive`, `preshared-key <file>`). Keys arrive as **files**
-  here (not inline) so private material never sits in `argv`.
+  `allowed-ips`, `persistent-keepalive`, `preshared-key <file>`). Private and preshared keys
+  arrive as **files** here (the peer public key is inline) so private material never sits in
+  `argv`.
 
 Parsing details that matter:
 
