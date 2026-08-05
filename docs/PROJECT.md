@@ -151,7 +151,6 @@ configuration file / CLI arguments.
 | OpenBSD | Supported | Kernel `if_wg` via ioctls. |
 | Windows | Supported | mingw build; WireGuardNT kernel driver or userspace named pipe; Windows ≥ 10. |
 | Android | Supported | `wg-quick/android.c` C implementation (used with the Android app ecosystem). |
-| Haiku | Best-effort | Build support in the Makefile (`-lnetwork -lbsd`); userspace only. |
 
 ---
 
@@ -203,14 +202,18 @@ Fork work, in order. Nothing below exists yet unless marked otherwise:
 1. **Sanitizer hardening pass** — build and exercise the codebase under ASan+LSan+UBSan and
    MSan (separate builds; UBSan extended checks are not enabled on the intentionally-wrapping
    Curve25519 code), fix EVERY finding at the root cause. No suppressions.
-2. **Unit-test suite** — vendor Unity (MIT, single `.c` + headers) under the test directory,
-   add table-driven tests for the parsers, encoders, config model, and UAPI protocol code;
+2. **Test suite** — vendor Unity (MIT, single `.c` + headers) under the test directory and
+   build three tiers: **unit** (table-driven tests for the parsers, encoders, config model,
+   and UAPI protocol code), **integration** (real protocol surfaces against test-owned local
+   sockets), and **end-to-end** (driving `wg`/`wg-quick` against a real backend, exercising
+   both the kernel netlink path and the userspace UAPI path via the sibling `wireguard-go`);
    wire `test`/sanitizer targets into the Makefile.
 3. **Static-analysis gate** — a `.clang-tidy` configuration (including `clang-analyzer-*`
    checks) at zero findings; scan-build retained for HTML deep dives.
-4. **CI (GitHub Actions)** — quality gates on PRs/pushes: build matrix (Linux + macOS, plus
-   cross-compile checks for the BSD/Windows targets), warnings-clean build, clang-tidy, unit
-   tests, sanitizer jobs, fuzz smoke.
+4. **CI (GitHub Actions)** — quality gates on PRs/pushes for **Linux and macOS**, run as
+   **independent parallel jobs** (no serialized dependencies between tiers): warnings-clean
+   build, clang-tidy, unit tests, integration tests, end-to-end tests, sanitizer builds,
+   fuzz smoke.
 5. **WebSocket settings support** — surface the sibling `wireguard-go` fork's WebSocket
    transport entirely through configuration files: new `[Interface]`/`[Peer]` keys parsed by
    `wg` and mapped onto the additive UAPI keys (`ws_listen`; per-peer `ws_mode`, `ws_target`,
