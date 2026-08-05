@@ -213,7 +213,8 @@ Fork work, in order. Nothing below exists yet unless marked otherwise:
 4. **CI (GitHub Actions)** — quality gates on PRs/pushes for **Linux and macOS**, run as
    **independent parallel jobs** (no serialized dependencies between tiers): warnings-clean
    build, clang-tidy, unit tests, integration tests, end-to-end tests, sanitizer builds,
-   fuzz smoke.
+   fuzz smoke. The e2e jobs obtain `wireguard-go` from the sibling fork's **latest GitHub
+   release**; local e2e runs use a locally built `wireguard-go`.
 5. **WebSocket settings support** — surface the sibling `wireguard-go` fork's WebSocket
    transport entirely through configuration files: new `[Interface]`/`[Peer]` keys parsed by
    `wg` and mapped onto the additive UAPI keys (`ws_listen`; per-peer `ws_mode`, `ws_target`,
