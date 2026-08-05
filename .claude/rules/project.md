@@ -8,11 +8,12 @@ FreeBSD, OpenBSD, Windows, and Android.
 
 > **This is a fork of upstream `wireguard-tools`** — sibling of the `wireguard-go` fork that
 > adds a WebSocket transport. Fork goals, in order: sanitizer hardening (ASan+LSan+UBSan+MSan),
-> a vendored-Unity test suite, a clang-tidy zero-findings gate, GitHub Actions CI, support for
-> the WebSocket settings via configuration files, and CI-built release artifacts for Linux and
-> macOS (GitHub releases + the `danielealbano/homebrew-wireguard` tap). Non-trivial work
-> proceeds via the development pipeline per `development_pipeline.md`. The canonical docs MUST
-> be kept current as changes land.
+> a vendored-Unity test suite (unit, integration, e2e), a clang-tidy zero-findings gate, GitHub
+> Actions CI (Linux + macOS, parallel jobs), support for the WebSocket settings via
+> configuration files, and CI-built release artifacts for Linux and macOS (GitHub releases +
+> the `danielealbano/homebrew-wireguard` tap). Non-trivial work proceeds via the development
+> pipeline per `development_pipeline.md`. The canonical docs MUST be kept current as changes
+> land.
 
 ## MANDATORY: Read These First
 
@@ -136,9 +137,9 @@ The **`src/Makefile`** is the authoritative command surface (details in `docs/PR
 
 **Quality gates (current)**: warnings-clean build on the touched platforms + `make -C src
 check` clean + fuzz harnesses still building. **Quality gates (target, per `c.md` §4 — wired
-in as the roadmap lands)**: unit tests, clang-tidy zero findings, ASan+LSan+UBSan and MSan
-builds green, fuzz smoke. Mermaid validation per `development_pipeline.md` §9 whenever docs
-charts are touched.
+in as the roadmap lands)**: unit + integration + e2e tests, clang-tidy zero findings,
+ASan+LSan+UBSan and MSan builds green, fuzz smoke — run as independent parallel CI jobs.
+Mermaid validation per `development_pipeline.md` §9 whenever docs charts are touched.
 
 ---
 
@@ -150,6 +151,9 @@ charts are touched.
   item 2; until it lands, the verification surface is warnings + scan-build + fuzzers.)
 - Tests MUST NEVER hit real networks or require privileges in the default run; IPC is
   exercised via test-owned local sockets/fds.
+- The e2e tier drives `wg`/`wg-quick` against real backends — both the kernel netlink path
+  and the userspace UAPI path (sibling `wireguard-go`) — via a dedicated target (privileges
+  allowed there, never in the default run), per `c.md` §3.
 - **Every parser MUST have fuzz coverage** — extend `src/fuzz/` in the same change.
 - **Sanitizers are mandatory** on the test suite: ASan+LSan+UBSan build and a separate MSan
   build. On macOS hosts, sanitizer jobs run in Linux containers (Docker); CI runs them on
