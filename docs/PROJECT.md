@@ -80,7 +80,7 @@ flowchart LR
 | `src/terminal.c` / `terminal.h` | ANSI color output with tty detection and filtering. |
 | `src/wg-quick/` | Per-platform `wg-quick` implementations (`linux`, `darwin`, `freebsd`, `openbsd` bash; `android.c`). |
 | `src/man/`, `src/completion/`, `src/systemd/` | Man pages, bash completions, `wg-quick@.service` + target. |
-| `src/wincompat/` | Windows libc shims, ELEVATE/loader, resources, manifest. |
+| `src/wincompat/` | Windows libc shims, delay-load loader, resources, manifest. |
 | `src/fuzz/` | libFuzzer harnesses (clang, `-fsanitize=fuzzer,address`). |
 | `src/uapi/` | Per-OS kernel header fallbacks. |
 | `contrib/` | Examples and integrations (embeddable-wg-library, json, reresolve-dns, launchd, highlighter, …). |

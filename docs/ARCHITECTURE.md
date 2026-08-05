@@ -140,8 +140,8 @@ flowchart TD
 
 - **Curve25519 only** — used to derive public keys (`pubkey`, and locally during UAPI `get`)
   and to clamp generated private keys. Two vendored formally-derived backends:
-  `curve25519-fiat32.h` (32-bit) and `curve25519-hacl64.h` (64-bit), selected by pointer
-  width at compile time.
+  `curve25519-fiat32.h` and `curve25519-hacl64.h`, selected at compile time by 128-bit
+  integer compiler support (`__SIZEOF_INT128__`).
 - **Randomness**: `getentropy` (OpenBSD / macOS 10.12+ / glibc ≥ 2.25) → `getrandom` syscall (Linux) →
   `/dev/urandom` read loop; Windows uses `RtlGenRandom`. Key generation refuses requests
   larger than 256 bytes and warns when stdout is a world-accessible regular file.
@@ -168,9 +168,10 @@ platform variant consistent.
 
 - **Secrets discipline**: `wg show` hides private/preshared keys unless `WG_HIDE_KEYS=never`;
   keys are read from files (not argv) in `wg set`; key files created by `wg-quick save` use
-  umask 077 with atomic replace; `genkey` warns on world-accessible stdout; config parse
-  errors quote values but key-parse errors are careful with content; `wg-quick` warns when
-  the config file is world-accessible.
+  umask 077 with atomic replace; `genkey` warns on world-accessible stdout; key-file and
+  `pubkey` stdin parse errors never echo content (inline config-file key values are quoted
+  in parse errors like any other value); `wg-quick` warns when the config file is
+  world-accessible.
 - **Input distrust**: every UAPI response byte, config line, and CLI argument is validated
   and bounded; the interface name is checked against path traversal (`/` rejected) before
   socket path construction; Windows verifies pipe ownership before speaking.
