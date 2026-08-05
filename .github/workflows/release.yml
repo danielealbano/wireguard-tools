@@ -24,7 +24,7 @@ jobs:
       - name: Install toolchain
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends make git gcc bash xz-utils ca-certificates ${{ matrix.cross }}
+          apt-get install -y make git gcc libc6-dev bash xz-utils ca-certificates ${{ matrix.cross }}
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0

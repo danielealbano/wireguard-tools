@@ -20,7 +20,7 @@ jobs:
       - name: Install toolchain
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ${{ matrix.cc }} make git ca-certificates
+          apt-get install -y ${{ matrix.cc }} libc6-dev make git ca-certificates
       - uses: actions/checkout@v4
       - name: Build (warnings as errors)
         env:
@@ -43,7 +43,7 @@ jobs:
       - name: Install toolchain
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends clang clang-tools clang-tidy make git perl ca-certificates
+          apt-get install -y clang clang-tools clang-tidy libc6-dev make git perl ca-certificates
       - uses: actions/checkout@v4
       - name: clang-tidy (analysis gate)
         working-directory: src
@@ -74,7 +74,7 @@ jobs:
       - name: Install toolchain
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends clang llvm make git ca-certificates
+          apt-get install -y clang llvm libc6-dev make git ca-certificates
       - uses: actions/checkout@v4
       - name: Build fuzzers (libFuzzer + ASan + UBSan)
         working-directory: src/fuzz
@@ -99,7 +99,7 @@ jobs:
       - name: Install toolchain
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends clang llvm make git ca-certificates
+          apt-get install -y clang llvm libc6-dev make git ca-certificates
       - uses: actions/checkout@v4
       - name: MemorySanitizer fuzz smoke (parsers)
         working-directory: src/fuzz
