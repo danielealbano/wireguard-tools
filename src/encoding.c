@@ -13,11 +13,11 @@ static inline void encode_base64(char dest[static 4], const uint8_t src[static 3
 	const uint8_t input[] = { (src[0] >> 2) & 63, ((src[0] << 4) | (src[1] >> 4)) & 63, ((src[1] << 2) | (src[2] >> 6)) & 63, src[2] & 63 };
 
 	for (unsigned int i = 0; i < 4; ++i)
-		dest[i] = input[i] + 'A'
+		dest[i] = (char)(input[i] + 'A'
 			  + (((25 - input[i]) >> 8) & 6)
 			  - (((51 - input[i]) >> 8) & 75)
 			  - (((61 - input[i]) >> 8) & 15)
-			  + (((62 - input[i]) >> 8) & 3);
+			  + (((62 - input[i]) >> 8) & 3));
 
 }
 
@@ -76,8 +76,8 @@ void key_to_hex(char hex[static WG_KEY_LEN_HEX], const uint8_t key[static WG_KEY
 	size_t i;
 
 	for (i = 0; i < WG_KEY_LEN; ++i) {
-		hex[i * 2] = 87U + (key[i] >> 4) + ((((key[i] >> 4) - 10U) >> 8) & ~38U);
-		hex[i * 2 + 1] = 87U + (key[i] & 0xf) + ((((key[i] & 0xf) - 10U) >> 8) & ~38U);
+		hex[i * 2] = (char)(87U + (key[i] >> 4) + ((((key[i] >> 4) - 10U) >> 8) & ~38U));
+		hex[i * 2 + 1] = (char)(87U + (key[i] & 0xf) + ((((key[i] & 0xf) - 10U) >> 8) & ~38U));
 	}
 	hex[i * 2] = '\0';
 }
