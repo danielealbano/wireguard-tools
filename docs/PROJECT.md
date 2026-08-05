@@ -183,7 +183,8 @@ Current state — this is what exists today:
 - **Fuzzing**: `src/fuzz/` builds six libFuzzer harnesses with `-fsanitize=fuzzer,address`,
   covering the config-file parser, the `set` CLI grammar, UAPI response parsing, the
   interface-list string handling, and the full command dispatcher. Harnesses `#include` the
-  `.c` files under test to reach internals.
+  `.c` files under test to reach internals, except the `cmd` dispatcher harness, which
+  compiles and links all of `src/*.c` with `main` renamed to `wg_main`.
 - **No external services, no live networks** — everything is a local binary plus local
   sockets. Testcontainers do not apply.
 
