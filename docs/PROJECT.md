@@ -106,7 +106,8 @@ INI-style, parsed case-insensitively, whitespace-stripped, `#` comments:
 - **`[Interface]`** — `PrivateKey`, `ListenPort`, `FwMark` (`off`/decimal/`0x` hex).
 - **`[Peer]`** — `PublicKey`, `PresharedKey`, `AllowedIPs` (comma-separated CIDRs; a `+`/`-`
   prefix switches to incremental add/remove instead of replace), `Endpoint` (`host:port` or
-  `[v6]:port`, DNS-resolved with retries), `PersistentKeepalive` (`off`/1–65535).
+  `[v6]:port`, DNS-resolved with retries), `PersistentKeepalive` (`0`/`off`/1–65535, `0`
+  meaning off).
 
 `wg-quick` accepts the same file plus its own `[Interface]` keys — `Address`, `DNS` (servers
 and search domains), `MTU`, `Table` (`auto`/`off`/table), `PreUp`/`PostUp`/`PreDown`/`PostDown`
