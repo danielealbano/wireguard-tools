@@ -1,43 +1,31 @@
-# clang-tidy configuration for wireguard-tools.
+# clang-tidy configuration for wireguard-tools — bug-finding gate.
 #
-# The gate is the Clang Static Analyzer (clang-analyzer-*) plus the genuine
-# bug-finding families (bugprone-*, performance-*, portability-*). Stylistic /
-# include-what-you-use / naming families are intentionally NOT enabled: the code
-# is upstream WireGuard C, and this fork keeps the upstream diff minimal (see
-# .claude/rules/project.md — MINIMAL UPSTREAM DIFF), so no reformatting churn.
+# Enabled: the Clang Static Analyzer (clang-analyzer-*) plus the genuine
+# bug-finding families bugprone-*, cert-*, misc-*, performance-*, portability-*.
+# All findings from these are fixed in the code; WarningsAsErrors fails CI on
+# any new one.
 #
-# The individually disabled bugprone checks below fire only on deliberate,
-# correct upstream idioms — not on defects — and enabling them would require
-# rewriting that upstream code:
-#   assignment-in-if-condition            -> the `key_match`/`get_value` idiom in config.c
-#   inc-dec-in-conditions                 -> the getaddrinfo retry loop (`!retries--`)
-#   suspicious-string-compare             -> boolean use of strcmp-family return values
-#   switch-missing-default-case           -> exhaustive switches over known values
-#   easily-swappable-parameters           -> style, not a defect
-#   implicit-widening-of-multiplication-result / narrowing-conversions
-#                                         -> benign, bounded arithmetic (sanitizer-clean)
-#   multi-level-implicit-pointer-conversion, reserved-identifier
-#                                         -> conforming upstream constructs
-#   macro-parentheses                     -> the NUM() macro in ipc-uapi.h; all callers
-#                                            pass simple constants (left upstream-verbatim)
+# misc-include-cleaner is DISABLED (the sole disabled check): it is an
+# include-what-you-use checker that fights this codebase's intentional header
+# abstraction — containers.h re-exports kernel constants (e.g. WG_KEY_LEN) and
+# the kernel UAPI header is selected per-platform via uapi/$(PLATFORM). Its
+# "fixes" add <linux/wireguard.h>, <asm-generic/*>, <features.h> to
+# platform-agnostic translation units (encoding.c, config.c, genkey.c) and
+# remove needed headers, breaking cross-platform builds. See docs/PROJECT.md
+# and .claude/rules/project.md (CROSS-PLATFORM BUILDS MUST NOT BREAK).
 #
-# clang-analyzer-* reports ZERO on the current tree (matches `make -C src check`
-# via scan-build). Any NEW finding from the enabled families fails CI.
+# Two correct-but-flagged idiom sites are muted inline with justification
+# (NOLINT), not disabled globally, so new code is still checked:
+#   config.c key_match() assign-and-test dispatch (assignment-in-if-condition)
+#   config.c parse_fwmark two same-type out-params (easily-swappable-parameters)
 Checks: >
   -*,
   clang-analyzer-*,
   bugprone-*,
+  cert-*,
+  misc-*,
   performance-*,
   portability-*,
-  -bugprone-assignment-in-if-condition,
-  -bugprone-easily-swappable-parameters,
-  -bugprone-implicit-widening-of-multiplication-result,
-  -bugprone-inc-dec-in-conditions,
-  -bugprone-switch-missing-default-case,
-  -bugprone-narrowing-conversions,
-  -bugprone-multi-level-implicit-pointer-conversion,
-  -bugprone-reserved-identifier,
-  -bugprone-suspicious-string-compare,
-  -bugprone-macro-parentheses
+  -misc-include-cleaner
 HeaderFilterRegex: '(config|ipc|ipc-uapi|ipc-uapi-unix|ipc-linux|containers|encoding|ctype|terminal|subcommands|curve25519)\.h$'
 WarningsAsErrors: '*'
