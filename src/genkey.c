@@ -61,7 +61,7 @@ static inline bool __attribute__((__warn_unused_result__)) get_random_bytes(uint
 		}
 	}
 	close(fd);
-	errno = -ret;
+	errno = (int)-ret;
 	return i == len;
 }
 #else

@@ -113,11 +113,13 @@ static int kernel_get_wireguard_interfaces(struct string_list *list)
 	}
 
 another:
-	if ((len = mnl_socket_recvfrom(nl, rtnl_buffer, SOCKET_BUFFER_SIZE)) < 0) {
+	len = mnl_socket_recvfrom(nl, rtnl_buffer, SOCKET_BUFFER_SIZE);
+	if (len < 0) {
 		ret = -errno;
 		goto cleanup;
 	}
-	if ((len = mnl_cb_run(rtnl_buffer, len, seq, portid, read_devices_cb, list)) < 0) {
+	len = mnl_cb_run(rtnl_buffer, len, seq, portid, read_devices_cb, list);
+	if (len < 0) {
 		/* Netlink returns NLM_F_DUMP_INTR if the set of all tunnels changed
 		 * during the dump. That's unfortunate, but is pretty common on busy
 		 * systems that are adding and removing tunnels all the time. Rather
@@ -296,6 +298,8 @@ static int parse_allowedip(const struct nlattr *attr, void *data)
 		if (!mnl_attr_validate(attr, MNL_TYPE_U8))
 			allowedip->cidr = mnl_attr_get_u8(attr);
 		break;
+	default:
+		break;
 	}
 
 	return MNL_CB_OK;
@@ -375,6 +379,8 @@ static int parse_peer(const struct nlattr *attr, void *data)
 		break;
 	case WGPEER_A_ALLOWEDIPS:
 		return mnl_attr_parse_nested(attr, parse_allowedips, peer);
+	default:
+		break;
 	}
 
 	return MNL_CB_OK;
@@ -443,6 +449,8 @@ static int parse_device(const struct nlattr *attr, void *data)
 		break;
 	case WGDEVICE_A_PEERS:
 		return mnl_attr_parse_nested(attr, parse_peers, device);
+	default:
+		break;
 	}
 
 	return MNL_CB_OK;
@@ -458,7 +466,7 @@ static void coalesce_peers(struct wgdevice *device)
 	struct wgpeer *old_next_peer, *peer = device->first_peer;
 
 	while (peer && peer->next_peer) {
-		if (memcmp(peer->public_key, peer->next_peer->public_key, sizeof(peer->public_key))) {
+		if (memcmp(peer->public_key, peer->next_peer->public_key, sizeof(peer->public_key)) != 0) {
 			peer = peer->next_peer;
 			continue;
 		}

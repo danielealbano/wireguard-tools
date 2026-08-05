@@ -53,18 +53,18 @@ static void sort_peers(struct wgdevice *device)
 		++peer_count;
 	if (!peer_count)
 		return;
-	peers = calloc(peer_count, sizeof(*peers));
+	peers = (struct wgpeer **)calloc(peer_count, sizeof(*peers));
 	if (!peers)
 		return;
 	for_each_wgpeer(device, peer)
 		peers[i++] = peer;
-	qsort(peers, peer_count, sizeof(*peers), peer_cmp);
+	qsort((void *)peers, peer_count, sizeof(*peers), peer_cmp);
 	device->first_peer = peers[0];
 	for (i = 1; i < peer_count; ++i) {
 		peers[i - 1]->next_peer = peers[i];
 	}
 	peers[peer_count - 1]->next_peer = NULL;
-	free(peers);
+	free((void *)peers);
 }
 
 static char *key(const uint8_t key[static WG_KEY_LEN])
@@ -131,12 +131,12 @@ static size_t pretty_time(char *buf, const size_t len, unsigned long long left)
 	size_t offset = 0;
 	unsigned long long years, days, hours, minutes, seconds;
 
-	years = left / (365 * 24 * 60 * 60);
-	left = left % (365 * 24 * 60 * 60);
-	days = left / (24 * 60 * 60);
-	left = left % (24 * 60 * 60);
-	hours = left / (60 * 60);
-	left = left % (60 * 60);
+	years = left / (365ULL * 24 * 60 * 60);
+	left = left % (365ULL * 24 * 60 * 60);
+	days = left / (24ULL * 60 * 60);
+	left = left % (24ULL * 60 * 60);
+	hours = left / (60ULL * 60);
+	left = left % (60ULL * 60);
 	minutes = left / 60;
 	seconds = left % 60;
 

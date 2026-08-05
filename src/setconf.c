@@ -77,7 +77,7 @@ static bool sync_conf(struct wgdevice *file)
 	for (i = 0; i < peer_count; ++i) {
 		if (peers[i].from_file)
 			continue;
-		if (i == peer_count - 1 || !peers[i + 1].from_file || memcmp(peers[i].peer->public_key, peers[i + 1].peer->public_key, WG_KEY_LEN)) {
+		if (i == peer_count - 1 || !peers[i + 1].from_file || memcmp(peers[i].peer->public_key, peers[i + 1].peer->public_key, WG_KEY_LEN) != 0) {
 			peer = calloc(1, sizeof(struct wgpeer));
 			if (!peer) {
 				free_wgdevice(runtime);

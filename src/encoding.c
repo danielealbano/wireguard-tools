@@ -23,7 +23,7 @@ static inline void encode_base64(char dest[static 4], const uint8_t src[static 3
 
 void key_to_base64(char base64[static WG_KEY_LEN_BASE64], const uint8_t key[static WG_KEY_LEN])
 {
-	unsigned int i;
+	size_t i;
 
 	for (i = 0; i < WG_KEY_LEN / 3; ++i)
 		encode_base64(&base64[i * 4], &key[i * 3]);
@@ -49,7 +49,7 @@ static inline int decode_base64(const char src[static 4])
 
 bool key_from_base64(uint8_t key[static WG_KEY_LEN], const char *base64)
 {
-	unsigned int i;
+	size_t i;
 	volatile uint8_t ret = 0;
 	int val;
 
@@ -73,7 +73,7 @@ bool key_from_base64(uint8_t key[static WG_KEY_LEN], const char *base64)
 
 void key_to_hex(char hex[static WG_KEY_LEN_HEX], const uint8_t key[static WG_KEY_LEN])
 {
-	unsigned int i;
+	size_t i;
 
 	for (i = 0; i < WG_KEY_LEN; ++i) {
 		hex[i * 2] = 87U + (key[i] >> 4) + ((((key[i] >> 4) - 10U) >> 8) & ~38U);

@@ -104,7 +104,7 @@ static int userspace_get_wireguard_interfaces(struct string_list *list)
 		if (len <= strlen(SOCK_SUFFIX))
 			continue;
 		end = &ent->d_name[len - strlen(SOCK_SUFFIX)];
-		if (strncmp(end, SOCK_SUFFIX, strlen(SOCK_SUFFIX)))
+		if (strncmp(end, SOCK_SUFFIX, strlen(SOCK_SUFFIX)) != 0)
 			continue;
 		*end = '\0';
 		if (!userspace_has_wireguard_interface(ent->d_name))

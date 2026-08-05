@@ -30,7 +30,7 @@ static const char *get_value(const char *line, const char *key)
 	if (keylen >= linelen)
 		return NULL;
 
-	if (strncasecmp(line, key, keylen))
+	if (strncasecmp(line, key, keylen) != 0)
 		return NULL;
 
 	return line + keylen;
@@ -74,6 +74,8 @@ static inline bool parse_port(uint16_t *port, uint32_t *flags, const char *value
 	return ret == 0;
 }
 
+/* fwmark and flags are distinct out-params by role; a wrapper type is not worth the churn. */
+/* NOLINTNEXTLINE(bugprone-easily-swappable-parameters) */
 static inline bool parse_fwmark(uint32_t *fwmark, uint32_t *flags, const char *value)
 {
 	unsigned long ret;
@@ -196,6 +198,8 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 {
 	char *mutable = strdup(value);
 	char *begin, *end;
+	char sep;
+	bool last_try;
 	int ret, retries = parse_dns_retries();
 	struct addrinfo *resolved;
 	struct addrinfo hints = {
@@ -221,7 +225,9 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 			return false;
 		}
 		*end++ = '\0';
-		if (*end++ != ':' || !*end) {
+		sep = *end;
+		++end;
+		if (sep != ':' || !*end) {
 			free(mutable);
 			(void) fprintf(stderr, "Unable to find port of endpoint: `%s'\n", value);
 			return false;
@@ -252,11 +258,14 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 		 *
 		 * So this is what we do, except FreeBSD removed EAI_NODATA some time ago, so that's conditional.
 		 */
+		last_try = (retries == 0);
+		if (retries >= 0)
+			--retries;
 		if (ret == EAI_NONAME || ret == EAI_FAIL ||
 			#ifdef EAI_NODATA
 				ret == EAI_NODATA ||
 			#endif
-				(retries >= 0 && !retries--)) {
+				last_try) {
 			free(mutable);
 			(void) fprintf(stderr, "%s: `%s'\n", ret == EAI_SYSTEM ? strerror(errno) : gai_strerror(ret), value);
 			return false;
@@ -348,6 +357,9 @@ static inline void parse_ip_prefix(struct wgpeer *peer, uint32_t *flags, char **
 	case '+':
 		peer->flags &= ~WGPEER_REPLACE_ALLOWEDIPS;
 		++(*mask);
+		break;
+	default:
+		break;
 	}
 }
 
@@ -464,6 +476,10 @@ static bool process_line(struct config_ctx *ctx, const char *line)
 
 #define key_match(key) (value = get_value(line, key "="))
 
+	/* key_match() is an intentional assign-and-test idiom driving the
+	 * section/key dispatch. A table-driven refactor is deferred until the
+	 * unit-test suite exists to guard this parser (see docs/PROJECT.md). */
+	/* NOLINTBEGIN(bugprone-assignment-in-if-condition) */
 	if (ctx->is_device_section) {
 		if (key_match("ListenPort"))
 			ret = parse_port(&ctx->device->listen_port, &ctx->device->flags, value);
@@ -494,6 +510,7 @@ static bool process_line(struct config_ctx *ctx, const char *line)
 			goto error;
 	} else
 		goto error;
+	/* NOLINTEND(bugprone-assignment-in-if-condition) */
 	return ret;
 
 #undef key_match

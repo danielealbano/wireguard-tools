@@ -95,6 +95,7 @@ static int userspace_set_device(struct wgdevice *dev)
 	(void) fprintf(f, "\n");
 	(void) fflush(f);
 
+	errno = 0;
 	while (getline(&key, &line_buffer_len, f) > 0) {
 		line_len = strlen(key);
 		ret = set_errno;
@@ -113,7 +114,7 @@ static int userspace_set_device(struct wgdevice *dev)
 			num = strtoll(value, &end, 10);
 			if (*end || num > INT_MAX || num < INT_MIN)
 				break;
-			set_errno = num;
+			set_errno = (int)num;
 		}
 	}
 	ret = errno ? -errno : -EPROTO;
@@ -130,7 +131,7 @@ out:
 	if (!char_is_digit(value[0])) \
 		break; \
 	num = strtoull(value, &end, 10); \
-	if (*end || num > max) \
+	if (*end || num > (max)) \
 		break; \
 	num; \
 })
@@ -206,6 +207,7 @@ static int userspace_get_device(struct wgdevice **out, const char *iface)
 				peer->flags |= WGPEER_HAS_PRESHARED_KEY;
 		} else if (peer && !strcmp(key, "endpoint")) {
 			char *begin, *end;
+			char sep;
 			struct addrinfo *resolved;
 			struct addrinfo hints = {
 				.ai_family = AF_UNSPEC,
@@ -220,7 +222,9 @@ static int userspace_get_device(struct wgdevice **out, const char *iface)
 				if (!end)
 					break;
 				*end++ = '\0';
-				if (*end++ != ':' || !*end)
+				sep = *end;
+				++end;
+				if (sep != ':' || !*end)
 					break;
 			} else {
 				begin = value;
@@ -280,7 +284,7 @@ static int userspace_get_device(struct wgdevice **out, const char *iface)
 		else if (peer && !strcmp(key, "tx_bytes"))
 			peer->tx_bytes = NUM(0xffffffffffffffffULL);
 		else if (!strcmp(key, "errno"))
-			ret = -NUM(0x7fffffffU);
+			ret = -(int)NUM(0x7fffffffU);
 	}
 	ret = -EPROTO;
 err:
