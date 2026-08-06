@@ -55,7 +55,7 @@ transfer-rx, transfer-tx, persistent-keepalive.
 Shows the current configuration of \fI<interface>\fP in the format described
 by \fICONFIGURATION FILE FORMAT\fP below.
 .TP
-\fBset\fP \fI<interface>\fP [\fIlisten-port\fP \fI<port>\fP] [\fIfwmark\fP \fI<fwmark>\fP] [\fIprivate-key\fP \fI<file-path>\fP] [\fIpeer\fP \fI<base64-public-key>\fP [\fIremove\fP] [\fIpreshared-key\fP \fI<file-path>\fP] [\fIendpoint\fP \fI<ip>:<port>\fP] [\fIpersistent-keepalive\fP \fI<interval seconds>\fP] [\fIallowed-ips\fP \fI[+|-]<ip1>/<cidr1>\fP[,\fI[+|-]<ip2>/<cidr2>\fP]...] ]...
+\fBset\fP \fI<interface>\fP [\fIlisten-port\fP \fI<port>\fP] [\fIfwmark\fP \fI<fwmark>\fP] [\fIprivate-key\fP \fI<file-path>\fP] [\fIws-listen\fP \fI<ws-url>\fP] [\fIws-server-tls-cert\fP \fI<file-path>\fP] [\fIws-server-tls-key\fP \fI<file-path>\fP] [\fIws-server-bearer\fP \fI<file-path>\fP] [\fIws-trusted-proxies\fP \fI<cidr,...>\fP] [\fIpeer\fP \fI<base64-public-key>\fP [\fIremove\fP] [\fIpreshared-key\fP \fI<file-path>\fP] [\fIendpoint\fP \fI<ip>:<port>\fP|\fI<ws-url>\fP] [\fIws-mode\fP \fI<websocket|wstunnel>\fP] [\fIwstunnel-target\fP \fI<host:port>\fP] [\fIws-bearer\fP \fI<file-path>\fP] [\fIws-mask\fP \fI<true|false>\fP] [\fIws-tls-ca\fP \fI<file-path>\fP] [\fIws-tls-cert\fP \fI<file-path>\fP] [\fIws-tls-key\fP \fI<file-path>\fP] [\fIws-tls-insecure\fP \fI<true|false>\fP] [\fIws-ping-interval\fP \fI<ms>\fP] [\fIws-backoff-min\fP \fI<ms>\fP] [\fIws-backoff-max\fP \fI<ms>\fP] [\fIpersistent-keepalive\fP \fI<interval seconds>\fP] [\fIallowed-ips\fP \fI[+|-]<ip1>/<cidr1>\fP[,\fI[+|-]<ip2>/<cidr2>\fP]...] ]...
 Sets configuration values for the specified \fI<interface>\fP. Multiple
 \fIpeer\fPs may be specified, and if the \fIremove\fP argument is given
 for a peer, that peer is removed, not configured. If \fIlisten-port\fP
@@ -143,6 +143,23 @@ randomly.
 .IP \(bu
 FwMark \(em a 32-bit fwmark for outgoing packets. If set to 0 or "off", this
 option is disabled. May be specified in hexadecimal by prepending "0x". Optional.
+.IP \(bu
+WSListen \(em a \fIws(s)://host:port/path\fP URL on which this device listens for WebSocket
+transport peers (the analogue of ListenPort). Requires the userspace implementation
+(\fIwireguard-go\fP >= 1.3.0); an empty value clears the listener. Optional.
+.IP \(bu
+WSServerTLSCert, WSServerTLSKey \(em file paths to the server's TLS certificate and private key
+for a \fIwss://\fP WSListen listener. Optional.
+.IP \(bu
+WSServerBearer \(em an expected \fIAuthorization: Bearer\fP value gating inbound WebSocket
+connections; an empty value disables the gate. Never logged. Optional.
+.IP \(bu
+WSTrustedProxies \(em a comma-separated list of CIDRs whose \fIX-Forwarded-For\fP header is
+trusted for the client's source address. Optional.
+.IP \(bu
+MetricsListen \(em a \fIhost:port\fP for an operational Prometheus metrics listener; consumed by
+\fIwg-quick\fP and exported to the userspace implementation as the \fIWG_METRICS_LISTEN\fP
+environment variable. Optional.
 .P
 The \fIPeer\fP sections may contain the following fields:
 .IP \(bu
@@ -163,7 +180,9 @@ which outgoing traffic for this peer is directed. The catch-all
 multiple times.
 .IP \(bu
 Endpoint \(em an endpoint IP or hostname, followed by a colon, and then a
-port number. This endpoint will be updated automatically to the most recent
+port number; or, for a WebSocket transport peer, a \fIws(s)://host:port/path\fP URL, in which case
+the host is resolved to the routable endpoint and the URL supplies the TLS SNI/Host and upgrade
+path. This endpoint will be updated automatically to the most recent
 source IP address and port of correctly authenticated packets from the peer.
 Optional.
 .IP \(bu
@@ -174,6 +193,30 @@ very rarely sends traffic, but it might at anytime receive traffic from a peer,
 and it is behind NAT, the interface might benefit from having a persistent keepalive
 interval of 25 seconds. If set to 0 or "off", this option is disabled. By default or
 when unspecified, this option is off. Most users will not need this. Optional.
+.IP \(bu
+WSMode \(em \fIwebsocket\fP or \fIwstunnel\fP, selecting the WebSocket carrier for a peer whose
+Endpoint is a \fIws(s)://\fP URL (or, with no Endpoint, an inbound WebSocket peer). Requires the
+userspace implementation (\fIwireguard-go\fP >= 1.3.0). Optional.
+.IP \(bu
+WSTunnelTarget \(em the \fIhost:port\fP of the inner WireGuard endpoint a wstunnel relay forwards
+to. Required when WSMode is \fIwstunnel\fP and rejected otherwise. Optional.
+.IP \(bu
+WSBearer \(em an authentication token sent to the server. Its exact HTTP scheme is transport
+dependent and applied by the userspace implementation (see the wireguard-go documentation). Never
+logged. Optional.
+.IP \(bu
+WSMask \(em \fItrue\fP to mask client WebSocket frames. Defaults to false. Optional.
+.IP \(bu
+WSTLSCA \(em a file path to a PEM CA bundle used to verify the server for a \fIwss://\fP peer. Optional.
+.IP \(bu
+WSTLSCert, WSTLSKey \(em file paths to a client certificate and key for mutual TLS with a
+\fIwss://\fP server. Optional.
+.IP \(bu
+WSTLSInsecure \(em \fItrue\fP to skip server-certificate verification for a \fIwss://\fP peer.
+Defaults to false. Optional.
+.IP \(bu
+WSPingInterval, WSBackoffMin, WSBackoffMax \(em the WebSocket keepalive ping interval and reconnect
+backoff bounds, in milliseconds (0 uses the defaults). Optional.
 
 .SH CONFIGURATION FILE FORMAT EXAMPLE
 This example may be used as a model for writing configuration files, following an

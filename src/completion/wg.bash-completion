@@ -47,9 +47,10 @@ _wg_completion() {
 			[[ $has_listen_port -eq 1 ]] || words+=( listen-port )
 			[[ $has_fwmark -eq 1 ]] || words+=( fwmark )
 			[[ $has_private_key -eq 1 ]] || words+=( private-key )
+			words+=( ws-listen ws-server-tls-cert ws-server-tls-key ws-server-bearer ws-trusted-proxies )
 			words+=( peer )
 			COMPREPLY+=( $(compgen -W "${words[*]}" -- "${COMP_WORDS[COMP_CWORD]}") )
-		elif [[ ${COMP_WORDS[COMP_CWORD-1]} == *-key ]]; then
+		elif [[ ${COMP_WORDS[COMP_CWORD-1]} == *-key || ${COMP_WORDS[COMP_CWORD-1]} == *-cert || ${COMP_WORDS[COMP_CWORD-1]} == *-bearer ]]; then
 			compopt -o filenames
 			mapfile -t a < <(compgen -f -- "${COMP_WORDS[COMP_CWORD]}")
 			COMPREPLY+=( "${a[@]}" )
@@ -89,6 +90,7 @@ _wg_completion() {
 		[[ $has_endpoint -eq 1 ]] || words+=( endpoint )
 		[[ $has_allowed_ips -eq 1 ]] || words+=( allowed-ips )
 		[[ $has_persistent_keepalive -eq 1 ]] || words+=( persistent-keepalive )
+		words+=( ws-mode wstunnel-target ws-bearer ws-mask ws-tls-ca ws-tls-cert ws-tls-key ws-tls-insecure ws-ping-interval ws-backoff-min ws-backoff-max )
 		words+=( remove )
 	fi
 	words+=( peer )
