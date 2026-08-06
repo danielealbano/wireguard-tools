@@ -27,6 +27,8 @@ SAVE_CONFIG=0
 CONFIG_FILE=""
 PROGRAM="${0##*/}"
 ARGS=( "$@" )
+WS_TRANSPORT="" WS_ROLE="" WS_MASK="" WS_TLS_CERT="" WS_TLS_KEY="" WS_TLS_CA=""
+WS_TLS_SERVERNAME="" WS_TLS_INSECURE="" WS_BEARER="" WS_PING_INTERVAL="" WS_TRUSTED_PROXIES="" WS_METRICS_LISTEN=""
 
 cmd() {
 	echo "[#] $*" >&3
@@ -36,6 +38,17 @@ cmd() {
 die() {
 	echo "$PROGRAM: $*" >&2
 	exit 1
+}
+
+# OpenBSD is kernel-only (no userspace WireGuard implementation), so WebSocket
+# settings can never take effect here — reject them rather than silently ignore.
+validate_ws_config() {
+	[[ ${WS_TRANSPORT,,} == ws ]] && return 0
+	local v
+	for v in "$WS_ROLE" "$WS_MASK" "$WS_TLS_CERT" "$WS_TLS_KEY" "$WS_TLS_CA" "$WS_TLS_SERVERNAME" \
+	         "$WS_TLS_INSECURE" "$WS_BEARER" "$WS_PING_INTERVAL" "$WS_TRUSTED_PROXIES"; do
+		[[ -n $v ]] && die "WebSocket settings require \`Transport = ws'"
+	done
 }
 
 parse_options() {
@@ -68,11 +81,24 @@ parse_options() {
 			PostUp) POST_UP+=( "$unstripped_value" ); continue ;;
 			PostDown) POST_DOWN+=( "$unstripped_value" ); continue ;;
 			SaveConfig) read_bool SAVE_CONFIG "$value"; continue ;;
+			Transport) WS_TRANSPORT="$value"; continue ;;
+			WSRole) WS_ROLE="$value"; continue ;;
+			WSMask) WS_MASK="$value"; continue ;;
+			WSTLSCert) WS_TLS_CERT="$value"; continue ;;
+			WSTLSKey) WS_TLS_KEY="$value"; continue ;;
+			WSTLSCA) WS_TLS_CA="$value"; continue ;;
+			WSTLSServerName) WS_TLS_SERVERNAME="$value"; continue ;;
+			WSTLSInsecure) WS_TLS_INSECURE="$value"; continue ;;
+			WSBearer) WS_BEARER="$value"; continue ;;
+			WSPingInterval) WS_PING_INTERVAL="$value"; continue ;;
+			WSTrustedProxies) WS_TRUSTED_PROXIES="$value"; continue ;;
+			MetricsListen) WS_METRICS_LISTEN="$value"; continue ;;
 			esac
 		fi
 		WG_CONFIG+="$line"$'\n'
 	done < "$CONFIG_FILE"
 	shopt -u nocasematch
+	validate_ws_config
 }
 
 read_bool() {
@@ -104,6 +130,7 @@ get_real_interface() {
 }
 
 add_if() {
+	[[ ${WS_TRANSPORT,,} == ws ]] && die "WebSocket transport requires a userspace implementation, unsupported on OpenBSD"
 	while true; do
 		local -A existing_ifs="( $(wg show interfaces | sed 's/\([^ ]*\)/[\1]=1/g') )"
 		local index ret

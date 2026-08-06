@@ -27,6 +27,8 @@ SAVE_CONFIG=0
 CONFIG_FILE=""
 PROGRAM="${0##*/}"
 ARGS=( "$@" )
+WS_TRANSPORT="" WS_ROLE="" WS_MASK="" WS_TLS_CERT="" WS_TLS_KEY="" WS_TLS_CA=""
+WS_TLS_SERVERNAME="" WS_TLS_INSECURE="" WS_BEARER="" WS_PING_INTERVAL="" WS_TRUSTED_PROXIES="" WS_METRICS_LISTEN=""
 
 cmd() {
 	echo "[#] $*" >&3
@@ -36,6 +38,30 @@ cmd() {
 die() {
 	echo "$PROGRAM: $*" >&2
 	exit 1
+}
+
+validate_ws_config() {
+	[[ ${WS_TRANSPORT,,} == ws ]] && return 0
+	local v
+	for v in "$WS_ROLE" "$WS_MASK" "$WS_TLS_CERT" "$WS_TLS_KEY" "$WS_TLS_CA" "$WS_TLS_SERVERNAME" \
+	         "$WS_TLS_INSECURE" "$WS_BEARER" "$WS_PING_INTERVAL" "$WS_TRUSTED_PROXIES"; do
+		[[ -n $v ]] && die "WebSocket settings require \`Transport = ws'"
+	done
+}
+
+export_ws_env() {
+	[[ -n $WS_TRANSPORT ]] && export WG_TRANSPORT="$WS_TRANSPORT"
+	[[ -n $WS_ROLE ]] && export WG_WS_ROLE="$WS_ROLE"
+	[[ -n $WS_MASK ]] && export WG_WS_MASK="$WS_MASK"
+	[[ -n $WS_TLS_CERT ]] && export WG_WS_TLS_CERT="$WS_TLS_CERT"
+	[[ -n $WS_TLS_KEY ]] && export WG_WS_TLS_KEY="$WS_TLS_KEY"
+	[[ -n $WS_TLS_CA ]] && export WG_WS_TLS_CA="$WS_TLS_CA"
+	[[ -n $WS_TLS_SERVERNAME ]] && export WG_WS_TLS_SERVERNAME="$WS_TLS_SERVERNAME"
+	[[ -n $WS_TLS_INSECURE ]] && export WG_WS_TLS_INSECURE="$WS_TLS_INSECURE"
+	[[ -n $WS_BEARER ]] && export WG_WS_BEARER="$WS_BEARER"
+	[[ -n $WS_PING_INTERVAL ]] && export WG_WS_PING_INTERVAL="$WS_PING_INTERVAL"
+	[[ -n $WS_TRUSTED_PROXIES ]] && export WG_WS_TRUSTED_PROXIES="$WS_TRUSTED_PROXIES"
+	[[ -n $WS_METRICS_LISTEN ]] && export WG_METRICS_LISTEN="$WS_METRICS_LISTEN"
 }
 
 CONFIG_SEARCH_PATHS=( /etc/wireguard /usr/local/etc/wireguard )
@@ -96,11 +122,24 @@ parse_options() {
 			PostUp) POST_UP+=( "$unstripped_value" ); continue ;;
 			PostDown) POST_DOWN+=( "$unstripped_value" ); continue ;;
 			SaveConfig) read_bool SAVE_CONFIG "$value"; continue ;;
+			Transport) WS_TRANSPORT="$value"; continue ;;
+			WSRole) WS_ROLE="$value"; continue ;;
+			WSMask) WS_MASK="$value"; continue ;;
+			WSTLSCert) WS_TLS_CERT="$value"; continue ;;
+			WSTLSKey) WS_TLS_KEY="$value"; continue ;;
+			WSTLSCA) WS_TLS_CA="$value"; continue ;;
+			WSTLSServerName) WS_TLS_SERVERNAME="$value"; continue ;;
+			WSTLSInsecure) WS_TLS_INSECURE="$value"; continue ;;
+			WSBearer) WS_BEARER="$value"; continue ;;
+			WSPingInterval) WS_PING_INTERVAL="$value"; continue ;;
+			WSTrustedProxies) WS_TRUSTED_PROXIES="$value"; continue ;;
+			MetricsListen) WS_METRICS_LISTEN="$value"; continue ;;
 			esac
 		fi
 		WG_CONFIG+="$line"$'\n'
 	done < "$CONFIG_FILE"
 	shopt -u nocasematch
+	validate_ws_config
 }
 
 read_bool() {
@@ -117,6 +156,11 @@ auto_su() {
 
 add_if() {
 	local ret rc
+	if [[ ${WS_TRANSPORT,,} == ws ]]; then
+		export_ws_env
+		cmd "${WG_QUICK_USERSPACE_IMPLEMENTATION:-wireguard-go}" "$INTERFACE"
+		return 0
+	fi
 	if ret="$(cmd ifconfig wg create name "$INTERFACE" 2>&1 >/dev/null)"; then
 		return 0
 	fi
@@ -126,6 +170,7 @@ add_if() {
 		return $rc
 	fi
 	echo "[!] Missing WireGuard kernel support ($ret). Falling back to slow userspace implementation." >&3
+	export_ws_env
 	cmd "${WG_QUICK_USERSPACE_IMPLEMENTATION:-wireguard-go}" "$INTERFACE"
 }
 
@@ -356,6 +401,18 @@ save_config() {
 	[[ -n $MTU ]] && new_config+="MTU = $MTU"$'\n'
 	[[ -n $TABLE ]] && new_config+="Table = $TABLE"$'\n'
 	[[ $SAVE_CONFIG -eq 0 ]] || new_config+=$'SaveConfig = true\n'
+	[[ -n $WS_TRANSPORT ]] && new_config+="Transport = $WS_TRANSPORT"$'\n'
+	[[ -n $WS_ROLE ]] && new_config+="WSRole = $WS_ROLE"$'\n'
+	[[ -n $WS_MASK ]] && new_config+="WSMask = $WS_MASK"$'\n'
+	[[ -n $WS_TLS_CERT ]] && new_config+="WSTLSCert = $WS_TLS_CERT"$'\n'
+	[[ -n $WS_TLS_KEY ]] && new_config+="WSTLSKey = $WS_TLS_KEY"$'\n'
+	[[ -n $WS_TLS_CA ]] && new_config+="WSTLSCA = $WS_TLS_CA"$'\n'
+	[[ -n $WS_TLS_SERVERNAME ]] && new_config+="WSTLSServerName = $WS_TLS_SERVERNAME"$'\n'
+	[[ -n $WS_TLS_INSECURE ]] && new_config+="WSTLSInsecure = $WS_TLS_INSECURE"$'\n'
+	[[ -n $WS_BEARER ]] && new_config+="WSBearer = $WS_BEARER"$'\n'
+	[[ -n $WS_PING_INTERVAL ]] && new_config+="WSPingInterval = $WS_PING_INTERVAL"$'\n'
+	[[ -n $WS_TRUSTED_PROXIES ]] && new_config+="WSTrustedProxies = $WS_TRUSTED_PROXIES"$'\n'
+	[[ -n $WS_METRICS_LISTEN ]] && new_config+="MetricsListen = $WS_METRICS_LISTEN"$'\n'
 	for cmd in "${PRE_UP[@]}"; do
 		new_config+="PreUp = $cmd"$'\n'
 	done
