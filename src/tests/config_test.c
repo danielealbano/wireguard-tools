@@ -168,7 +168,12 @@ static void test_config_finish_ws_endpoint_requires_mode(void)
 
 static void test_config_finish_rejects_double_endpoint(void)
 {
+	const char *argv[] = { "peer", PUBKEY, "endpoint", "1.2.3.4:51820", "endpoint", "wss://h:443", "ws-mode", "standard" };
+
+	/* config-file path */
 	TEST_ASSERT_NULL(parse_file("[Peer]\nPublicKey = " PUBKEY "\nEndpoint = 1.2.3.4:51820\nEndpoint = wss://h:443\nWSMode = standard\n", false));
+	/* CLI path */
+	TEST_ASSERT_NULL(config_read_cmd(argv, sizeof(argv) / sizeof(argv[0])));
 }
 
 static void test_config_cmd_ws_tokens_parity(void)
