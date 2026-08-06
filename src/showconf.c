@@ -46,6 +46,8 @@ int showconf_main(int argc, const char *argv[])
 		key_to_base64(base64, device->private_key);
 		printf("PrivateKey = %s\n", base64);
 	}
+	if (device->flags & WGDEVICE_HAS_WS_LISTEN)
+		printf("WSListen = %s\n", device->ws_listen);
 	printf("\n");
 	for_each_wgpeer(device, peer) {
 		key_to_base64(base64, peer->public_key);
@@ -72,7 +74,9 @@ int showconf_main(int argc, const char *argv[])
 		if (peer->first_allowedip)
 			printf("\n");
 
-		if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6) {
+		if (peer->endpoint_url)
+			printf("Endpoint = %s\n", peer->endpoint_url);
+		else if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6) {
 			char host[4096 + 1];
 			char service[512 + 1];
 			socklen_t addr_len = 0;
@@ -88,6 +92,12 @@ int showconf_main(int argc, const char *argv[])
 					printf("Endpoint = %s:%s\n", host, service);
 			}
 		}
+		if (peer->ws_mode)
+			printf("WSMode = %s\n", peer->ws_mode);
+		if (peer->wstunnel_target)
+			printf("WSTunnelTarget = %s\n", peer->wstunnel_target);
+		if (peer->ws_bearer)
+			printf("WSPeerBearer = %s\n", peer->ws_bearer);
 
 		if (peer->persistent_keepalive_interval)
 			printf("PersistentKeepalive = %u\n", peer->persistent_keepalive_interval);

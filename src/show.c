@@ -228,7 +228,9 @@ static void pretty_print(struct wgdevice *device)
 		terminal_printf(TERMINAL_FG_YELLOW TERMINAL_BOLD "peer" TERMINAL_RESET ": " TERMINAL_FG_YELLOW "%s" TERMINAL_RESET "\n", key(peer->public_key));
 		if (peer->flags & WGPEER_HAS_PRESHARED_KEY)
 			terminal_printf("  " TERMINAL_BOLD "preshared key" TERMINAL_RESET ": %s\n", masked_key(peer->preshared_key));
-		if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6)
+		if (peer->endpoint_url)
+			terminal_printf("  " TERMINAL_BOLD "endpoint" TERMINAL_RESET ": %s\n", peer->endpoint_url);
+		else if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6)
 			terminal_printf("  " TERMINAL_BOLD "endpoint" TERMINAL_RESET ": %s\n", endpoint(&peer->endpoint.addr));
 		terminal_printf("  " TERMINAL_BOLD "allowed ips" TERMINAL_RESET ": ");
 		if (peer->first_allowedip) {
@@ -269,7 +271,9 @@ static void dump_print(struct wgdevice *device, bool with_interface)
 			printf("%s\t", device->name);
 		printf("%s\t", key(peer->public_key));
 		printf("%s\t", maybe_key(peer->preshared_key, peer->flags & WGPEER_HAS_PRESHARED_KEY));
-		if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6)
+		if (peer->endpoint_url)
+			printf("%s\t", peer->endpoint_url);
+		else if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6)
 			printf("%s\t", endpoint(&peer->endpoint.addr));
 		else
 			printf("(none)\t");
@@ -316,7 +320,9 @@ static bool ugly_print(struct wgdevice *device, const char *param, bool with_int
 			if (with_interface)
 				printf("%s\t", device->name);
 			printf("%s\t", key(peer->public_key));
-			if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6)
+			if (peer->endpoint_url)
+				printf("%s\n", peer->endpoint_url);
+			else if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6)
 				printf("%s\n", endpoint(&peer->endpoint.addr));
 			else
 				printf("(none)\n");
