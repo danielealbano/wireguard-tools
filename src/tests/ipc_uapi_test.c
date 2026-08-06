@@ -139,6 +139,31 @@ static void test_ipc_uapi_roundtrip_get_websocket(void)
 	free_wgdevice(dev);
 }
 
+static void test_ipc_uapi_explicit_device_ws_empty_clears(void)
+{
+	struct seam s;
+	struct wgdevice *dev = calloc(1, sizeof(*dev));
+	int r;
+
+	TEST_ASSERT_NOT_NULL(dev);
+	strncpy(dev->name, "wsdev", IFNAMSIZ - 1);
+	/* A non-empty ws_listen plus three device keys flagged-but-empty (an explicit clear). The
+	 * ws_server_tls_key flag is left unset, so that key must not be emitted at all. */
+	dev->ws_listen = strdup("wss://0.0.0.0:8443/wg");
+	dev->flags = WGDEVICE_HAS_WS_LISTEN | WGDEVICE_HAS_WS_SERVER_TLS_CERT |
+		     WGDEVICE_HAS_WS_SERVER_BEARER | WGDEVICE_HAS_WS_TRUSTED_PROXIES;
+	seam_start(&s, "wsdev", "errno=0\n\n");
+	r = userspace_set_device(dev);
+	seam_stop(&s);
+	TEST_ASSERT_EQUAL_INT(0, r);
+	TEST_ASSERT_NOT_NULL_MESSAGE(strstr(s.captured, "ws_listen=wss://0.0.0.0:8443/wg\n"), "non-empty ws_listen emitted");
+	TEST_ASSERT_NOT_NULL_MESSAGE(strstr(s.captured, "ws_server_tls_cert=\n"), "empty cert clears");
+	TEST_ASSERT_NOT_NULL_MESSAGE(strstr(s.captured, "ws_server_bearer=\n"), "empty bearer clears");
+	TEST_ASSERT_NOT_NULL_MESSAGE(strstr(s.captured, "ws_trusted_proxies=\n"), "empty proxies clears");
+	TEST_ASSERT_NULL_MESSAGE(strstr(s.captured, "ws_server_tls_key="), "unflagged key not emitted");
+	free_wgdevice(dev);
+}
+
 static void test_ipc_uapi_device_server_keys(void)
 {
 	struct seam s;
@@ -170,6 +195,7 @@ int main(void)
 	RUN_TEST(test_ipc_uapi_omits_transport_without_flag);
 	RUN_TEST(test_ipc_uapi_udp_setconf_emits_transport_no_ws);
 	RUN_TEST(test_ipc_uapi_roundtrip_get_websocket);
+	RUN_TEST(test_ipc_uapi_explicit_device_ws_empty_clears);
 	RUN_TEST(test_ipc_uapi_device_server_keys);
 	return UNITY_END();
 }
