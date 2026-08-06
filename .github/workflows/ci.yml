@@ -129,7 +129,7 @@ jobs:
       - name: Unit tests (plain)
         run: make -C src/tests CC=${{ matrix.cc }}
       - name: Unit tests (ASan+LSan+UBSan)
-        run: make -C src/tests clean && make -C src/tests CC=clang SANITIZE=address
+        run: make -C src/tests clean && make -C src/tests CC=${{ matrix.cc }} SANITIZE=address
 
   unit-tests-msan:
     runs-on: ubuntu-latest
