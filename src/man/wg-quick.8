@@ -102,6 +102,16 @@ the commands are executed in order.
 SaveConfig \(em if set to `true', the configuration is saved from the current state of the
 interface upon shutdown. Any changes made to the configuration file before the
 interface is removed will therefore be overwritten.
+.IP \(bu
+Transport \(em `udp' (default) or `ws' to select the WebSocket transport of a
+userspace WireGuard implementation. When set to `ws', \fBwg-quick\fP always uses
+the userspace implementation.
+.IP \(bu
+WSRole, WSMask, WSTLSCert, WSTLSKey, WSTLSCA, WSTLSServerName, WSTLSInsecure,
+WSBearer, WSPingInterval, WSTrustedProxies, MetricsListen \(em daemon-level
+WebSocket/metrics settings passed as environment variables to the userspace
+WireGuard implementation when it is launched. These require `Transport = ws'
+(except MetricsListen, which is transport-independent).
 
 .P
 Recommended \fIINTERFACE\fP names include `wg0' or `wgvpn0' or even `wgmgmtlan0'.
