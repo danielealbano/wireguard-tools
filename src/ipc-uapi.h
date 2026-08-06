@@ -49,6 +49,8 @@ static int userspace_set_device(struct wgdevice *dev)
 		(void) fprintf(f, "listen_port=%u\n", dev->listen_port);
 	if (dev->flags & WGDEVICE_HAS_FWMARK)
 		(void) fprintf(f, "fwmark=%u\n", dev->fwmark);
+	if (dev->flags & WGDEVICE_HAS_WS_LISTEN)
+		(void) fprintf(f, "ws_listen=%s\n", dev->ws_listen);
 	if (dev->flags & WGDEVICE_REPLACE_PEERS)
 		(void) fprintf(f, "replace_peers=true\n");
 
@@ -63,7 +65,9 @@ static int userspace_set_device(struct wgdevice *dev)
 			key_to_hex(hex, peer->preshared_key);
 			(void) fprintf(f, "preshared_key=%s\n", hex);
 		}
-		if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6) {
+		if (peer->endpoint_url)
+			(void) fprintf(f, "endpoint=%s\n", peer->endpoint_url);
+		else if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6) {
 			addr_len = 0;
 			if (peer->endpoint.addr.sa_family == AF_INET)
 				addr_len = sizeof(struct sockaddr_in);
@@ -76,6 +80,12 @@ static int userspace_set_device(struct wgdevice *dev)
 					(void) fprintf(f, "endpoint=%s:%s\n", host, service);
 			}
 		}
+		if (peer->ws_mode)
+			(void) fprintf(f, "ws_mode=%s\n", peer->ws_mode);
+		if (peer->wstunnel_target)
+			(void) fprintf(f, "wstunnel_target=%s\n", peer->wstunnel_target);
+		if (peer->ws_bearer)
+			(void) fprintf(f, "ws_bearer=%s\n", peer->ws_bearer);
 		if (peer->flags & WGPEER_HAS_PERSISTENT_KEEPALIVE_INTERVAL)
 			(void) fprintf(f, "persistent_keepalive_interval=%u\n", peer->persistent_keepalive_interval);
 		if (peer->flags & WGPEER_REPLACE_ALLOWEDIPS)
@@ -184,6 +194,14 @@ static int userspace_get_device(struct wgdevice **out, const char *iface)
 		} else if (!peer && !strcmp(key, "fwmark")) {
 			dev->fwmark = NUM(0xffffffffU);
 			dev->flags |= WGDEVICE_HAS_FWMARK;
+		} else if (!peer && !strcmp(key, "ws_listen")) {
+			free(dev->ws_listen);
+			dev->ws_listen = strdup(value);
+			if (!dev->ws_listen) {
+				ret = -ENOMEM;
+				goto err;
+			}
+			dev->flags |= WGDEVICE_HAS_WS_LISTEN;
 		} else if (!strcmp(key, "public_key")) {
 			struct wgpeer *new_peer = calloc(1, sizeof(*new_peer));
 
@@ -206,45 +224,75 @@ static int userspace_get_device(struct wgdevice **out, const char *iface)
 			if (!key_is_zero(peer->preshared_key))
 				peer->flags |= WGPEER_HAS_PRESHARED_KEY;
 		} else if (peer && !strcmp(key, "endpoint")) {
-			char *begin, *end;
-			char sep;
-			struct addrinfo *resolved;
-			struct addrinfo hints = {
-				.ai_family = AF_UNSPEC,
-				.ai_socktype = SOCK_DGRAM,
-				.ai_protocol = IPPROTO_UDP
-			};
-			if (!strlen(value))
-				break;
-			if (value[0] == '[') {
-				begin = &value[1];
-				end = strchr(value, ']');
-				if (!end)
-					break;
-				*end++ = '\0';
-				sep = *end;
-				++end;
-				if (sep != ':' || !*end)
-					break;
+			if (is_ws_url(value)) {
+				free(peer->endpoint_url);
+				peer->endpoint_url = strdup(value);
+				if (!peer->endpoint_url) {
+					ret = -ENOMEM;
+					goto err;
+				}
 			} else {
-				begin = value;
-				end = strrchr(value, ':');
-				if (!end || !*(end + 1))
+				char *begin, *end;
+				char sep;
+				struct addrinfo *resolved;
+				struct addrinfo hints = {
+					.ai_family = AF_UNSPEC,
+					.ai_socktype = SOCK_DGRAM,
+					.ai_protocol = IPPROTO_UDP
+				};
+				if (!strlen(value))
 					break;
-				*end++ = '\0';
+				if (value[0] == '[') {
+					begin = &value[1];
+					end = strchr(value, ']');
+					if (!end)
+						break;
+					*end++ = '\0';
+					sep = *end;
+					++end;
+					if (sep != ':' || !*end)
+						break;
+				} else {
+					begin = value;
+					end = strrchr(value, ':');
+					if (!end || !*(end + 1))
+						break;
+					*end++ = '\0';
+				}
+				if (getaddrinfo(begin, end, &hints, &resolved) != 0) {
+					ret = ENETUNREACH;
+					goto err;
+				}
+				if ((resolved->ai_family == AF_INET && resolved->ai_addrlen == sizeof(struct sockaddr_in)) ||
+				    (resolved->ai_family == AF_INET6 && resolved->ai_addrlen == sizeof(struct sockaddr_in6)))
+					memcpy(&peer->endpoint.addr, resolved->ai_addr, resolved->ai_addrlen);
+				else  {
+					freeaddrinfo(resolved);
+					break;
+				}
+				freeaddrinfo(resolved);
 			}
-			if (getaddrinfo(begin, end, &hints, &resolved) != 0) {
-				ret = ENETUNREACH;
+		} else if (peer && !strcmp(key, "ws_mode")) {
+			free(peer->ws_mode);
+			peer->ws_mode = strdup(value);
+			if (!peer->ws_mode) {
+				ret = -ENOMEM;
 				goto err;
 			}
-			if ((resolved->ai_family == AF_INET && resolved->ai_addrlen == sizeof(struct sockaddr_in)) ||
-			    (resolved->ai_family == AF_INET6 && resolved->ai_addrlen == sizeof(struct sockaddr_in6)))
-				memcpy(&peer->endpoint.addr, resolved->ai_addr, resolved->ai_addrlen);
-			else  {
-				freeaddrinfo(resolved);
-				break;
+		} else if (peer && !strcmp(key, "wstunnel_target")) {
+			free(peer->wstunnel_target);
+			peer->wstunnel_target = strdup(value);
+			if (!peer->wstunnel_target) {
+				ret = -ENOMEM;
+				goto err;
 			}
-			freeaddrinfo(resolved);
+		} else if (peer && !strcmp(key, "ws_bearer")) {
+			free(peer->ws_bearer);
+			peer->ws_bearer = strdup(value);
+			if (!peer->ws_bearer) {
+				ret = -ENOMEM;
+				goto err;
+			}
 		} else if (peer && !strcmp(key, "persistent_keepalive_interval")) {
 			peer->persistent_keepalive_interval = NUM(0xffffU);
 			peer->flags |= WGPEER_HAS_PERSISTENT_KEEPALIVE_INTERVAL;
