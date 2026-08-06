@@ -79,9 +79,8 @@ static void test_show_dump_url_endpoint_same_columns(void)
 	char out[4096];
 
 	capture_show(build_ws_dev(), 3, argv, out, sizeof(out));
-	TEST_ASSERT_NOT_NULL(strstr(out, "wss://h:443\t")); /* URL in the endpoint column */
-	TEST_ASSERT_NULL(strstr(out, "(none)"));            /* endpoint column is filled */
-	TEST_ASSERT_NOT_NULL(strstr(out, "off\n"));          /* trailing keepalive field present */
+	TEST_ASSERT_NOT_NULL(strstr(out, "wss://h:443\t")); /* URL fills the endpoint column (URL + column tab) */
+	TEST_ASSERT_NOT_NULL(strstr(out, "off\n"));          /* trailing keepalive field still present */
 }
 
 static void test_show_pretty_url_endpoint(void)

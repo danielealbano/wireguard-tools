@@ -9,6 +9,9 @@ CC ?= cc
 TESTS := $(patsubst %_test.c,%,$(wildcard *_test.c))
 CFLAGS ?= -O1 -g
 CFLAGS += -std=gnu11 -D_GNU_SOURCE -I.. -Iunity -Wall -Wextra
+# Keep Unity from pulling <math.h>: its C23 narrowing fmul()/fadd()/… collide with
+# the static fmul()/… in the vendored curve25519-hacl64.h when a test includes both.
+CFLAGS += -DUNITY_EXCLUDE_MATH_H
 ifneq ($(wildcard ../uapi/$(PLATFORM)/.),)
 CFLAGS += -isystem ../uapi/$(PLATFORM)
 endif
