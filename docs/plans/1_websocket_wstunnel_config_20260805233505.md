@@ -1002,4 +1002,19 @@ discovery (c.md: parsers get fuzz coverage in the same change). Depends on: US3,
 
 ## Deviations
 
-_(none yet — recorded during implementation per agent.md §2)_
+- **Action 3.2.1 (WSListen config-file dispatch)** — `get_value()` returns NULL for a zero-length
+  value (`keylen >= linelen`), so `key_match("WSListen")` never matches the explicit-disable form
+  `WSListen=` (empty). The device dispatch instead uses `!strncasecmp(line, "WSListen=", …)` and passes
+  `line + strlen("WSListen=")`, which accepts both empty and non-empty values. The CLI path is
+  unaffected (it does not go through `get_value`). Caught by `test_config_parse_wslisten_empty_disables`.
+- **Action 3.3.1 (CLI validation pass)** — reuses `config_read_cmd`'s existing `peer` walker variable
+  for the `for_each_wgpeer` validation loop rather than declaring a new `vp`; equivalent and smaller.
+- **Action 3.1.1 (parse_ws_mode)** — uses `strcmp(...) != 0` (explicit) to satisfy the clang-tidy
+  `bugprone-suspicious-string-compare` gate; the plan's illustrative `strcmp` was implicit.
+- **Action 1.2.1 (tests Makefile)** — added `-DUNITY_EXCLUDE_MATH_H`: Unity's `<math.h>` brings glibc's
+  C23 narrowing `fmul()`/`fadd()`/… which collide with the `static fmul()`/… in the vendored
+  `curve25519-hacl64.h` when a test includes both (`ipc_guard_test`, `ipc_uapi_test`). The `src/fuzz`
+  harnesses avoid this only because they never include Unity.
+- **Action 6.3.1 (show_test dump case)** — the `dump` line legitimately prints `(none)` for a peer's
+  absent preshared-key and allowed-ips columns, so the URL-in-endpoint-column assertion checks
+  `"<url>\t"` (URL followed by the column tab) instead of asserting no `(none)` anywhere.
