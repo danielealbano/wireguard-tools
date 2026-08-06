@@ -48,7 +48,7 @@ Authoritative detail lives in `docs/PROJECT.md`.
 | Static analysis | **clang-tidy** (`src/.clang-tidy`) gate + scan-build (`make -C src check`) | clang-tidy (`clang-analyzer-*` + curated bugprone/perf/portability) is the CI gate; scan-build is informational/local. clang-format deliberately NOT used. |
 | CI / Release | **GitHub Actions** (`.github/workflows/`) | `ci.yml` (build gcc+clang/macOS, clang-tidy, fuzz+MSan smoke, parallel); `release.yml` (`v*` tags → Linux amd64/arm64 + macOS universal tarballs + SHA256SUMS). |
 | Fuzzing | libFuzzer + ASan (`src/fuzz/`, clang) | Six harnesses: config/CLI parsers, UAPI response parsing, interface-list handling, command dispatch. |
-| Unit tests | **Unity**, vendored (planned) | Lands with the fork's test-suite pass; policy in `c.md` §3. |
+| Unit tests | **Unity**, vendored (`src/tests/unity/`) | `make -C src/tests` (+`SANITIZE=address`/`memory`); socket-seam UAPI tests. Policy in `c.md` §3. |
 | Windows | llvm-mingw + `src/wincompat/` | Windows ≥ 10. |
 | Versioning | `git describe` → `WIREGUARD_TOOLS_VERSION` | Fork releases: upstream base + suffix (e.g. `1.0.20260223+ws1`). |
 
@@ -134,18 +134,19 @@ The **`src/Makefile`** is the authoritative command surface (details in `docs/PR
 - `make -C src check` — clean rebuild under scan-build (Clang Static Analyzer).
 - `make -C src install` — install binary, man pages, completions, wg-quick, systemd units.
 - `make -C src clean`.
+- `make -C src/tests` — build + run the Unity unit tests (`SANITIZE=address` / `SANITIZE=memory` variants).
 - `make -C src/fuzz` — build the libFuzzer harnesses (clang required).
 - `make -C src check` — scan-build (Clang Static Analyzer, HTML; local deep-dive).
 - Cross/variants: `PLATFORM=<os>`, `DEBUG=yes`, `V=1`.
 - CI (`.github/workflows/ci.yml`) enforces: `CFLAGS="-O2 -Werror" make -C src CC=<gcc|clang>`,
-  clang-tidy per file (config `src/.clang-tidy`), fuzz ASan+UBSan smoke, MSan parser smoke —
-  parallel, Linux (`ubuntu:26.04` container) + macOS. `release.yml` builds tagged artifacts.
+  clang-tidy per file (config `src/.clang-tidy`), the Unity unit tests (`unit-tests` gcc+clang
+  plain+ASan, `unit-tests-msan`), fuzz ASan+UBSan smoke, MSan parser smoke — parallel, Linux
+  (`ubuntu:26.04` container) + macOS. `release.yml` builds tagged artifacts.
 
-**Quality gates (current)**: warnings-clean build on the touched platforms + `make -C src
-check` clean + fuzz harnesses still building. **Quality gates (target, per `c.md` §4 — wired
-in as the roadmap lands)**: unit + integration + e2e tests, clang-tidy zero findings,
-ASan+LSan+UBSan and MSan builds green, fuzz smoke — run as independent parallel CI jobs.
-Mermaid validation per `development_pipeline.md` §9 whenever docs charts are touched.
+**Quality gates**: warnings-clean build on the touched platforms + `make -C src check` clean +
+the Unity unit tests green (plain + ASan+LSan+UBSan + MSan) + fuzz harnesses still building. The
+remaining `c.md` §4 target is the end-to-end tier. Mermaid validation per
+`development_pipeline.md` §9 whenever docs charts are touched.
 
 ---
 
@@ -153,8 +154,10 @@ Mermaid validation per `development_pipeline.md` §9 whenever docs charts are to
 
 - Framework: **Unity, vendored in-repo** — the ONLY test framework (see `c.md` §3). No
   external test dependencies of any kind. Suite location: `src/tests/` (Unity vendored under
-  `src/tests/unity/`), following the `src/fuzz/` harness pattern. (Test suite is roadmap
-  item 2; until it lands, the verification surface is warnings + scan-build + fuzzers.)
+  `src/tests/unity/`), following the `src/fuzz/` harness pattern: `make -C src/tests` (plain,
+  `SANITIZE=address` for ASan+LSan+UBSan, `SANITIZE=memory` for MSan). A test-owned UNIX-socket
+  seam (`test_uapi_seam.h`) drives the real UAPI unprivileged. The unit + integration tiers are
+  in place; the end-to-end tier is still to come.
 - Tests MUST NEVER hit real networks or require privileges in the default run; IPC is
   exercised via test-owned local sockets/fds.
 - The e2e tier drives `wg`/`wg-quick` against real backends — both the kernel netlink path

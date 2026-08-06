@@ -52,8 +52,9 @@ Parsing details that matter:
 - `Endpoint` accepts `host:port` and `[v6]:port`, resolved via `getaddrinfo` with a retry
   loop (default 15 retries, `WG_ENDPOINT_RESOLUTION_RETRIES`, `infinity` supported;
   permanent DNS failures abort immediately). The result is stored as a raw
-  `sockaddr_in`/`sockaddr_in6` union in the peer — the model has no textual endpoint today
-  (the WebSocket roadmap item extends exactly this point).
+  `sockaddr_in`/`sockaddr_in6` union in the peer. A `ws://`/`wss://` value is instead stored
+  verbatim as a textual `endpoint_url` (mutually exclusive with the `sockaddr`), for the
+  WebSocket transport — see the WebSocket surface below.
 - `AllowedIPs` defaults to replace-all semantics; a `+`/`-` prefix on an entry switches the
   whole peer to incremental mode (`-` additionally flags `WGALLOWEDIP_REMOVE_ME`), and a
   nonzero host part only warns.
@@ -108,8 +109,31 @@ Keys are hex on the wire (base64 in config files and display). `wg` validates ev
 line, bounds every number (`NUM(max)` macro), and treats protocol violations as `-EPROTO`.
 The device public key is never sent by the daemon — `wg` derives it from the returned private
 key. This protocol is the compatibility contract with `wireguard-go` and every other
-userspace implementation; the WebSocket roadmap item adds keys here, never changes existing
-ones.
+userspace implementation; the WebSocket keys below are strictly additive to it, never changing
+existing ones.
+
+### WebSocket / wstunnel configuration surface
+
+The sibling `wireguard-go` fork's WebSocket transport is configured from config files/CLI, split
+by how the daemon consumes each setting (requires `wireguard-go` ≥ 1.2.0):
+
+- **Bucket B — per-tunnel, over the UAPI socket.** `wg` parses `WSListen` (`[Interface]`) and a
+  `ws(s)://` `Endpoint`, `WSMode`, `WSTunnelTarget`, `WSPeerBearer` (`[Peer]`) from both config
+  files (`process_line`) and the `wg set` CLI (`config_read_cmd`), stores them on the device
+  model, serializes them to `set=1` (`ws_listen`, `endpoint`, `ws_mode`, `wstunnel_target`,
+  `ws_bearer`), and reads them back from `get=1` — so `wg showconf` round-trips and `wg show`
+  renders a URL endpoint in the existing endpoint slot (the secret `ws_bearer` is never shown).
+  `WSListen` is gated by `WGDEVICE_HAS_WS_LISTEN` and is NOT part of the full-`setconf` clear-on-
+  absent preset: an absent `WSListen` preserves the daemon's listener, an explicit empty value
+  disables it. A device carrying any WS setting is rejected on a kernel interface (`ipc.c`).
+- **Bucket A — daemon-level, via environment.** `wg-quick` captures the `[Interface]` keys
+  `Transport`, `WSRole`, `WSMask`, `WSTLS*`, `WSBearer`, `WSPingInterval`, `WSTrustedProxies`,
+  `MetricsListen`, strips them from the config it hands to `wg`, and exports them as
+  `WG_TRANSPORT`/`WG_WS_*`/`WG_METRICS_LISTEN` when it launches the userspace daemon —
+  `Transport=ws` forces the userspace path (kernel-first scripts skip the kernel attempt;
+  OpenBSD, kernel-only, fails fast). These env vars are the sibling fork's bootstrap variables,
+  invisible to end users and consistent with the env-vars-only-tune-tool-behavior convention.
+  `SaveConfig` re-emits the captured Bucket A keys so a down/reload round-trips.
 
 ## 5. wg-quick Orchestration (Linux flow)
 

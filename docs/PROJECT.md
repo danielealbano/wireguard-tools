@@ -60,7 +60,7 @@ flowchart LR
 | Windows | **llvm-mingw** (`x86_64-w64-mingw32-clang`) | `src/wincompat/` shims, delay-loaded DLLs, Windows ≥ 10. |
 | Static analysis | **scan-build** (`make check`) | Clang Static Analyzer over the full build. clang-tidy gate: see [Roadmap](#roadmap). |
 | Fuzzing | **libFuzzer + ASan** (`src/fuzz/`) | Six harnesses: `config`, `uapi`, `stringlist`, `cmd`, `set`, `setconf`; clang required. |
-| Unit tests | **Unity** (vendored) — planned | Lands with the fork's test-suite pass; see [Roadmap](#roadmap) and `.claude/rules/c.md`. |
+| Unit tests | **Unity** (vendored, `src/tests/unity/`) | `make -C src/tests` (plain + `SANITIZE=address`/`memory`); a socket seam drives the real UAPI. See `.claude/rules/c.md`. |
 | Versioning | `git describe` → `WIREGUARD_TOOLS_VERSION` | Injected by the Makefile from `git describe`; `version.h` provides the fallback version string and is the sole source for the Windows resource version. |
 
 ---
@@ -189,9 +189,15 @@ CI-enforced commands (see `.github/workflows/`):
 
 Current state — this is what exists today:
 
-- **No unit-test suite yet.** The verification surface is the warnings-clean build
-  (`-Wall -Wextra -Werror` in CI), the **clang-tidy** analysis gate, informational scan-build,
-  and the fuzzers (built with ASan+UBSan and smoke-run in CI, plus an MSan parser smoke).
+- **Unit tests (Unity)**: `src/tests/` holds vendored Unity (`src/tests/unity/`) and one
+  `*_test.c` per unit, built by an auto-discovering Makefile (`make -C src/tests`, plus
+  `SANITIZE=address` for ASan+LSan+UBSan and `SANITIZE=memory` for MSan). Tests `#include` the
+  `.c` under test to reach `static` internals (the `src/fuzz` pattern); `test_uapi_seam.h`
+  binds a test-owned UNIX socket so the real `userspace_set_device`/`get_device` run
+  unprivileged. CI runs `unit-tests` (gcc+clang, plain+ASan) and `unit-tests-msan` in parallel.
+  The **end-to-end** tier is still to come (see [Roadmap](#roadmap)).
+- The build stays warnings-clean (`-Wall -Wextra -Werror` in CI) under the **clang-tidy**
+  analysis gate, with informational scan-build.
 - **Fuzzing**: `src/fuzz/` builds six libFuzzer harnesses with `-fsanitize=fuzzer,address`,
   covering the config-file parser, the `set` CLI grammar, UAPI response parsing, the
   interface-list string handling, and the full command dispatcher. Harnesses `#include` the
@@ -200,12 +206,11 @@ Current state — this is what exists today:
 - **No external services, no live networks** — everything is a local binary plus local
   sockets. Testcontainers do not apply.
 
-Decided direction (see [Roadmap](#roadmap) and `.claude/rules/c.md`): a vendored **Unity**
-unit-test suite, a mandatory **ASan+LSan+UBSan / MSan** sanitizer gate (Linux-only
-sanitizers run in Linux containers on macOS hosts; CI runs the sanitizer jobs on Linux
-runners), fuzz coverage required for every parser, and a **clang-tidy**
-(including `clang-analyzer-*`) zero-findings policy. clang-format is deliberately NOT used —
-the upstream code style is preserved to keep the fork's diff minimal.
+Standing policy (see `.claude/rules/c.md`): the vendored **Unity** unit-test suite, a mandatory
+**ASan+LSan+UBSan / MSan** sanitizer gate (Linux-only sanitizers run in Linux containers on
+macOS hosts; CI runs the sanitizer jobs on Linux runners), fuzz coverage required for every
+parser, and a **clang-tidy** (including `clang-analyzer-*`) zero-findings policy. clang-format
+is deliberately NOT used — the upstream code style is preserved to keep the fork's diff minimal.
 
 ---
 
@@ -227,25 +232,31 @@ the upstream code style is preserved to keep the fork's diff minimal.
 - **Release automation** — `.github/workflows/release.yml`: `v*` tags build prebuilt tarballs
   for Linux (amd64 + arm64 cross) and macOS (universal), with `SHA256SUMS`, published to a
   GitHub release. Versioning: upstream base + fork suffix (e.g. `1.0.20260223+ws1`).
+- **Unit-test suite (Unity)** — vendored Unity (MIT) under `src/tests/unity/`, an
+  auto-discovering `src/tests/Makefile` with **ASan+LSan+UBSan** and a separate **MSan**
+  variant, and a test-owned UNIX-socket UAPI seam (`test_uapi_seam.h`) for driving the real
+  `userspace_set_device`/`get_device` unprivileged. Run in CI as parallel `unit-tests`
+  (gcc+clang, plain+ASan) and `unit-tests-msan` jobs. The integration tier is covered by the
+  socket seam; the full **end-to-end** tier (driving `wg`/`wg-quick` against a real backend) is
+  still planned (see below).
+- **WebSocket/wstunnel configuration surface** — the sibling `wireguard-go` fork's WebSocket
+  transport is configured entirely through config files/CLI (see `docs/CONFIGURATION`-style
+  layout in `docs/ARCHITECTURE.md` §8). **Bucket B** (per-tunnel, over the UAPI socket): `wg`
+  parses `WSListen` (`[Interface]`), a `ws(s)://` `Endpoint`, `WSMode`, `WSTunnelTarget`, and
+  `WSPeerBearer` (`[Peer]`) from both config files and the `wg set` CLI, serializes them to
+  `set=1`, and reads them back from `get=1` (so `showconf` round-trips). **Bucket A**
+  (daemon-level): `wg-quick` captures the `[Interface]` keys `Transport`, `WSRole`, `WSMask`,
+  `WSTLS*`, `WSBearer`, `WSPingInterval`, `WSTrustedProxies`, `MetricsListen`, strips them, and
+  exports them as `WG_TRANSPORT`/`WG_WS_*`/`WG_METRICS_LISTEN` when launching the userspace
+  daemon (forcing the userspace path on `Transport=ws`). Requires **`wireguard-go` ≥ 1.2.0**
+  (the `wstunnel_target` UAPI key). WS settings are rejected on a kernel interface.
 
 **Planned**
 
-1. **Test suite** — vendor Unity (MIT, single `.c` + headers) under `src/tests/` and build
-   three tiers: **unit** (table-driven tests for the parsers, encoders, config model, and
-   UAPI protocol code), **integration** (real protocol surfaces against test-owned local
-   sockets), and **end-to-end** (driving `wg`/`wg-quick` against a real backend, exercising
-   both the kernel netlink path and the userspace UAPI path via the sibling `wireguard-go`).
-   The CI test/e2e jobs and Makefile `test` target land with it; e2e obtains `wireguard-go`
-   from the sibling fork's **latest GitHub release** (local e2e uses a locally built one).
-2. **WebSocket settings support** — surface the sibling `wireguard-go` fork's WebSocket
-   transport entirely through configuration files: new `[Interface]`/`[Peer]` keys parsed by
-   `wg` and mapped onto the additive UAPI keys (`ws_listen`; per-peer `ws_mode`, `ws_target`,
-   `ws_bearer`; `ws(s)://` endpoint URLs), plus daemon-level keys consumed by `wg-quick` and
-   handed to the daemon at launch via the sibling fork's `WG_TRANSPORT`/`WG_WS_*` bootstrap
-   environment variables (daemon-side variables of `wireguard-go`, invisible to end users —
-   consistent with this repo's env-vars-only-tune-tool-behavior convention). Requires extending the endpoint model beyond `sockaddr`,
-   URL-aware show/showconf output, a clean error on kernel backends, man-page and completion
-   updates, and fuzz/test coverage.
-3. **Homebrew tap** — a `danielealbano/homebrew-wireguard` tap with formulas for this fork
+1. **End-to-end test tier** — drive `wg`/`wg-quick` against a real backend (both the kernel
+   netlink path and the userspace UAPI path via the sibling `wireguard-go`), via a dedicated
+   target; e2e obtains `wireguard-go` from the sibling fork's **latest GitHub release** (local
+   e2e uses a locally built one). The unit + integration tiers are delivered (above).
+2. **Homebrew tap** — a `danielealbano/homebrew-wireguard` tap with formulas for this fork
    and the `wireguard-go` fork, installing the prebuilt release binaries. Debian/Ubuntu
    packaging is deliberately out of scope for now.
