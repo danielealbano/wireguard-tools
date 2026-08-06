@@ -445,6 +445,111 @@ err:
 	return false;
 }
 
+static bool parse_ws_listen(char **out, uint32_t *flags, const char *value)
+{
+	if (value[0] && !is_ws_url(value)) {
+		(void) fprintf(stderr, "WSListen is neither empty nor a ws(s):// URL: `%s'\n", value);
+		return false;
+	}
+	free(*out); /* "" (empty) is a valid explicit-disable value */
+	*out = strdup(value);
+	if (!*out) {
+		perror("strdup");
+		return false;
+	}
+	*flags |= WGDEVICE_HAS_WS_LISTEN;
+	return true;
+}
+
+static bool parse_ws_endpoint(char **out, const char *value)
+{
+	if (!is_ws_url(value)) {
+		(void) fprintf(stderr, "WebSocket endpoint is not a ws(s):// URL: `%s'\n", value);
+		return false;
+	}
+	free(*out);
+	*out = strdup(value);
+	if (!*out) {
+		perror("strdup");
+		return false;
+	}
+	return true;
+}
+
+static bool parse_ws_mode(char **out, const char *value)
+{
+	if (strcmp(value, "standard") && strcmp(value, "wstunnel")) {
+		(void) fprintf(stderr, "WSMode is neither standard nor wstunnel: `%s'\n", value);
+		return false;
+	}
+	free(*out);
+	*out = strdup(value);
+	if (!*out) {
+		perror("strdup");
+		return false;
+	}
+	return true;
+}
+
+static bool parse_wstunnel_target(char **out, const char *value)
+{
+	const char *sep = strrchr(value, ':');
+
+	if (!sep || sep == value || !sep[1]) {
+		(void) fprintf(stderr, "WSTunnelTarget is not in host:port form: `%s'\n", value);
+		return false;
+	}
+	free(*out);
+	*out = strdup(value);
+	if (!*out) {
+		perror("strdup");
+		return false;
+	}
+	return true;
+}
+
+static bool parse_ws_bearer(char **out, const char *value)
+{
+	if (!value[0]) { /* never echo the token itself */
+		(void) fprintf(stderr, "WSPeerBearer is empty\n");
+		return false;
+	}
+	free(*out);
+	*out = strdup(value);
+	if (!*out) {
+		perror("strdup");
+		return false;
+	}
+	return true;
+}
+
+/* full=true for a complete config (config_read_finish): a WS attribute requires a
+ * WS endpoint. full=false for incremental `wg set` (config_read_cmd): standalone WS
+ * attributes are accepted. The endpoint-anchored checks apply on both paths. */
+static bool validate_ws_peer(const struct wgpeer *peer, bool full)
+{
+	bool has_ws_key = peer->ws_mode || peer->wstunnel_target || peer->ws_bearer;
+	bool has_udp = peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6;
+
+	if (full && has_ws_key && !peer->endpoint_url) {
+		(void) fprintf(stderr, "A peer has WebSocket settings but no ws(s):// Endpoint\n");
+		return false;
+	}
+	if (peer->endpoint_url && has_udp) {
+		(void) fprintf(stderr, "A peer has both a UDP and a WebSocket Endpoint\n");
+		return false;
+	}
+	if (peer->endpoint_url && !peer->ws_mode) {
+		(void) fprintf(stderr, "A WebSocket Endpoint peer is missing WSMode\n");
+		return false;
+	}
+	if (peer->endpoint_url && peer->ws_mode && !strcmp(peer->ws_mode, "wstunnel") && !peer->wstunnel_target) {
+		(void) fprintf(stderr, "WSMode=wstunnel requires WSTunnelTarget\n");
+		return false;
+	}
+	return true;
+}
+
 static bool process_line(struct config_ctx *ctx, const char *line)
 {
 	const char *value;
@@ -489,12 +594,17 @@ static bool process_line(struct config_ctx *ctx, const char *line)
 			ret = parse_key(ctx->device->private_key, value);
 			if (ret)
 				ctx->device->flags |= WGDEVICE_HAS_PRIVATE_KEY;
-		} else
+		} else if (key_match("WSListen"))
+			ret = parse_ws_listen(&ctx->device->ws_listen, &ctx->device->flags, value);
+		else
 			goto error;
 	} else if (ctx->is_peer_section) {
-		if (key_match("Endpoint"))
-			ret = parse_endpoint(&ctx->last_peer->endpoint.addr, value);
-		else if (key_match("PublicKey")) {
+		if (key_match("Endpoint")) {
+			if (is_ws_url(value))
+				ret = parse_ws_endpoint(&ctx->last_peer->endpoint_url, value);
+			else
+				ret = parse_endpoint(&ctx->last_peer->endpoint.addr, value);
+		} else if (key_match("PublicKey")) {
 			ret = parse_key(ctx->last_peer->public_key, value);
 			if (ret)
 				ctx->last_peer->flags |= WGPEER_HAS_PUBLIC_KEY;
@@ -506,7 +616,13 @@ static bool process_line(struct config_ctx *ctx, const char *line)
 			ret = parse_key(ctx->last_peer->preshared_key, value);
 			if (ret)
 				ctx->last_peer->flags |= WGPEER_HAS_PRESHARED_KEY;
-		} else
+		} else if (key_match("WSMode"))
+			ret = parse_ws_mode(&ctx->last_peer->ws_mode, value);
+		else if (key_match("WSTunnelTarget"))
+			ret = parse_wstunnel_target(&ctx->last_peer->wstunnel_target, value);
+		else if (key_match("WSPeerBearer"))
+			ret = parse_ws_bearer(&ctx->last_peer->ws_bearer, value);
+		else
 			goto error;
 	} else
 		goto error;
@@ -577,6 +693,8 @@ struct wgdevice *config_read_finish(struct config_ctx *ctx)
 			(void) fprintf(stderr, "A peer is missing a public key\n");
 			goto err;
 		}
+		if (!validate_ws_peer(peer, true))
+			goto err;
 	}
 	return ctx->device;
 err:
@@ -629,6 +747,11 @@ struct wgdevice *config_read_cmd(const char *argv[], int argc)
 			device->flags |= WGDEVICE_HAS_PRIVATE_KEY;
 			argv += 2;
 			argc -= 2;
+		} else if (!strcmp(argv[0], "ws-listen") && argc >= 2 && !peer) {
+			if (!parse_ws_listen(&device->ws_listen, &device->flags, argv[1]))
+				goto error;
+			argv += 2;
+			argc -= 2;
 		} else if (!strcmp(argv[0], "peer") && argc >= 2) {
 			struct wgpeer *new_peer = calloc(1, sizeof(*new_peer));
 
@@ -652,7 +775,25 @@ struct wgdevice *config_read_cmd(const char *argv[], int argc)
 			argv += 1;
 			argc -= 1;
 		} else if (!strcmp(argv[0], "endpoint") && argc >= 2 && peer) {
-			if (!parse_endpoint(&peer->endpoint.addr, argv[1]))
+			if (is_ws_url(argv[1])) {
+				if (!parse_ws_endpoint(&peer->endpoint_url, argv[1]))
+					goto error;
+			} else if (!parse_endpoint(&peer->endpoint.addr, argv[1]))
+				goto error;
+			argv += 2;
+			argc -= 2;
+		} else if (!strcmp(argv[0], "ws-mode") && argc >= 2 && peer) {
+			if (!parse_ws_mode(&peer->ws_mode, argv[1]))
+				goto error;
+			argv += 2;
+			argc -= 2;
+		} else if (!strcmp(argv[0], "wstunnel-target") && argc >= 2 && peer) {
+			if (!parse_wstunnel_target(&peer->wstunnel_target, argv[1]))
+				goto error;
+			argv += 2;
+			argc -= 2;
+		} else if (!strcmp(argv[0], "ws-bearer") && argc >= 2 && peer) {
+			if (!parse_ws_bearer(&peer->ws_bearer, argv[1]))
 				goto error;
 			argv += 2;
 			argc -= 2;
@@ -683,6 +824,10 @@ struct wgdevice *config_read_cmd(const char *argv[], int argc)
 			(void) fprintf(stderr, "Invalid argument: %s\n", argv[0]);
 			goto error;
 		}
+	}
+	for_each_wgpeer(device, peer) {
+		if (!validate_ws_peer(peer, false))
+			goto error;
 	}
 	return device;
 error:
