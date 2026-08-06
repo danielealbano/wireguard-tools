@@ -478,7 +478,7 @@ static bool parse_ws_endpoint(char **out, const char *value)
 
 static bool parse_ws_mode(char **out, const char *value)
 {
-	if (strcmp(value, "standard") && strcmp(value, "wstunnel")) {
+	if (strcmp(value, "standard") != 0 && strcmp(value, "wstunnel") != 0) {
 		(void) fprintf(stderr, "WSMode is neither standard nor wstunnel: `%s'\n", value);
 		return false;
 	}
@@ -594,8 +594,10 @@ static bool process_line(struct config_ctx *ctx, const char *line)
 			ret = parse_key(ctx->device->private_key, value);
 			if (ret)
 				ctx->device->flags |= WGDEVICE_HAS_PRIVATE_KEY;
-		} else if (key_match("WSListen"))
-			ret = parse_ws_listen(&ctx->device->ws_listen, &ctx->device->flags, value);
+		} else if (!strncasecmp(line, "WSListen=", sizeof("WSListen=") - 1))
+			/* not key_match(): an explicit empty value (disable) must be accepted,
+			 * but get_value() rejects a zero-length value. */
+			ret = parse_ws_listen(&ctx->device->ws_listen, &ctx->device->flags, line + sizeof("WSListen=") - 1);
 		else
 			goto error;
 	} else if (ctx->is_peer_section) {
