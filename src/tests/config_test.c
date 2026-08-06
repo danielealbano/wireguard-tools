@@ -143,7 +143,12 @@ static void test_config_parse_wstunnel_target_form(void)
 
 static void test_config_parse_ws_bearer_empty_rejected(void)
 {
+	const char *argv[] = { "peer", PUBKEY, "ws-bearer", "" };
+
+	/* config-file form: rejected before parse_ws_bearer (get_value drops empty values) */
 	TEST_ASSERT_NULL(parse_file("[Peer]\nPublicKey = " PUBKEY "\nEndpoint = wss://h:443\nWSMode = standard\nWSPeerBearer =\n", false));
+	/* CLI form: exercises parse_ws_bearer's empty-token rejection (message echoes no value) */
+	TEST_ASSERT_NULL(config_read_cmd(argv, sizeof(argv) / sizeof(argv[0])));
 }
 
 static void test_config_finish_wstunnel_requires_target(void)
