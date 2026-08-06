@@ -86,11 +86,34 @@ int ipc_get_device(struct wgdevice **dev, const char *iface)
 #endif
 }
 
+#ifdef IPC_SUPPORTS_KERNEL_INTERFACE
+/* WebSocket/wstunnel settings are meaningful only on the userspace backend.
+ * Defined inside the kernel-interface guard so it is not an unused static on
+ * userspace-only builds (e.g. macOS/darwin). */
+static bool device_has_ws_settings(const struct wgdevice *dev)
+{
+	struct wgpeer *peer;
+
+	if (dev->flags & WGDEVICE_HAS_WS_LISTEN)
+		return true;
+	for_each_wgpeer(dev, peer) {
+		if (peer->endpoint_url || peer->ws_mode || peer->wstunnel_target || peer->ws_bearer)
+			return true;
+	}
+	return false;
+}
+#endif
+
 int ipc_set_device(struct wgdevice *dev)
 {
 #ifdef IPC_SUPPORTS_KERNEL_INTERFACE
 	if (userspace_has_wireguard_interface(dev->name))
 		return userspace_set_device(dev);
+	if (device_has_ws_settings(dev)) {
+		(void) fprintf(stderr, "WebSocket settings require a userspace WireGuard implementation; `%s' is a kernel interface\n", dev->name);
+		errno = EOPNOTSUPP;
+		return -errno;
+	}
 	return kernel_set_device(dev);
 #else
 	return userspace_set_device(dev);
