@@ -48,6 +48,7 @@ validate_ws_config() {
 	         "$WS_TLS_INSECURE" "$WS_BEARER" "$WS_PING_INTERVAL" "$WS_TRUSTED_PROXIES"; do
 		[[ -n $v ]] && die "WebSocket settings require \`Transport = ws'"
 	done
+	return 0
 }
 
 export_ws_env() {
@@ -63,6 +64,7 @@ export_ws_env() {
 	[[ -n $WS_PING_INTERVAL ]] && export WG_WS_PING_INTERVAL="$WS_PING_INTERVAL"
 	[[ -n $WS_TRUSTED_PROXIES ]] && export WG_WS_TRUSTED_PROXIES="$WS_TRUSTED_PROXIES"
 	[[ -n $WS_METRICS_LISTEN ]] && export WG_METRICS_LISTEN="$WS_METRICS_LISTEN"
+	return 0
 }
 
 [[ ${BASH_VERSINFO[0]} -ge 4 ]] || die "Version mismatch: bash ${BASH_VERSINFO[0]} detected, when bash 4+ required"

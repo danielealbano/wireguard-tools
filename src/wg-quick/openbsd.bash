@@ -49,6 +49,7 @@ validate_ws_config() {
 	         "$WS_TLS_INSECURE" "$WS_BEARER" "$WS_PING_INTERVAL" "$WS_TRUSTED_PROXIES"; do
 		[[ -n $v ]] && die "WebSocket settings require \`Transport = ws'"
 	done
+	return 0
 }
 
 parse_options() {
