@@ -230,6 +230,10 @@ static void pretty_print(struct wgdevice *device)
 			terminal_printf("  " TERMINAL_BOLD "preshared key" TERMINAL_RESET ": %s\n", masked_key(peer->preshared_key));
 		if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6)
 			terminal_printf("  " TERMINAL_BOLD "endpoint" TERMINAL_RESET ": %s\n", endpoint(&peer->endpoint.addr));
+		if (peer->transport != WGPEER_TRANSPORT_UDP)
+			terminal_printf("  " TERMINAL_BOLD "transport" TERMINAL_RESET ": %s\n", peer->transport == WGPEER_TRANSPORT_WSTUNNEL ? "wstunnel" : "websocket");
+		if (peer->ws_url)
+			terminal_printf("  " TERMINAL_BOLD "ws url" TERMINAL_RESET ": %s\n", peer->ws_url);
 		terminal_printf("  " TERMINAL_BOLD "allowed ips" TERMINAL_RESET ": ");
 		if (peer->first_allowedip) {
 			for_each_wgallowedip(peer, allowedip)

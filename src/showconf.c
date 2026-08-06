@@ -46,6 +46,18 @@ int showconf_main(int argc, const char *argv[])
 		key_to_base64(base64, device->private_key);
 		printf("PrivateKey = %s\n", base64);
 	}
+	/* Emit each device WebSocket key only when it holds a non-empty value, so a cleared key is
+	 * omitted from the regenerated config. */
+	if (device->ws_listen && *device->ws_listen)
+		printf("WSListen = %s\n", device->ws_listen);
+	if (device->ws_server_tls_cert && *device->ws_server_tls_cert)
+		printf("WSServerTLSCert = %s\n", device->ws_server_tls_cert);
+	if (device->ws_server_tls_key && *device->ws_server_tls_key)
+		printf("WSServerTLSKey = %s\n", device->ws_server_tls_key);
+	if (device->ws_server_bearer && *device->ws_server_bearer)
+		printf("WSServerBearer = %s\n", device->ws_server_bearer);
+	if (device->ws_trusted_proxies && *device->ws_trusted_proxies)
+		printf("WSTrustedProxies = %s\n", device->ws_trusted_proxies);
 	printf("\n");
 	for_each_wgpeer(device, peer) {
 		key_to_base64(base64, peer->public_key);
@@ -72,7 +84,34 @@ int showconf_main(int argc, const char *argv[])
 		if (peer->first_allowedip)
 			printf("\n");
 
-		if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6) {
+		if (peer->transport != WGPEER_TRANSPORT_UDP) {
+			/* A WebSocket peer (dialing or inbound) round-trips via WSMode + the WS* keys; the
+			 * ws(s):// Endpoint is emitted only for a dialing peer (one with a ws_url). An
+			 * inbound peer thus round-trips as WSMode with no Endpoint. */
+			printf("WSMode = %s\n", peer->transport == WGPEER_TRANSPORT_WSTUNNEL ? "wstunnel" : "websocket");
+			if (peer->ws_url)
+				printf("Endpoint = %s\n", peer->ws_url);
+			if (peer->wstunnel_target)
+				printf("WSTunnelTarget = %s\n", peer->wstunnel_target);
+			if (peer->ws_bearer)
+				printf("WSBearer = %s\n", peer->ws_bearer);
+			if (peer->ws_mask)
+				printf("WSMask = true\n");
+			if (peer->ws_tls_ca)
+				printf("WSTLSCA = %s\n", peer->ws_tls_ca);
+			if (peer->ws_tls_cert)
+				printf("WSTLSCert = %s\n", peer->ws_tls_cert);
+			if (peer->ws_tls_key)
+				printf("WSTLSKey = %s\n", peer->ws_tls_key);
+			if (peer->ws_tls_insecure)
+				printf("WSTLSInsecure = true\n");
+			if (peer->ws_ping_interval_ms)
+				printf("WSPingInterval = %u\n", peer->ws_ping_interval_ms);
+			if (peer->ws_backoff_min_ms)
+				printf("WSBackoffMin = %u\n", peer->ws_backoff_min_ms);
+			if (peer->ws_backoff_max_ms)
+				printf("WSBackoffMax = %u\n", peer->ws_backoff_max_ms);
+		} else if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6) {
 			char host[4096 + 1];
 			char service[512 + 1];
 			socklen_t addr_len = 0;
