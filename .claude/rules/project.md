@@ -9,9 +9,10 @@ FreeBSD, OpenBSD, Windows, and Android.
 > **This is a fork of upstream `wireguard-tools`** — sibling of the `wireguard-go` fork that
 > adds a WebSocket transport. Fork goals, in order: sanitizer hardening (ASan+LSan+UBSan+MSan),
 > a vendored-Unity test suite (unit, integration, e2e), a clang-tidy zero-findings gate, GitHub
-> Actions CI (Linux + macOS, parallel jobs), support for the WebSocket settings via
-> configuration files, and CI-built release artifacts for Linux and macOS (GitHub releases +
-> the `danielealbano/homebrew-wireguard` tap). Non-trivial work proceeds via the development
+> Actions CI (Linux + macOS, parallel jobs), config-file/CLI support for the sibling fork's
+> per-peer WebSocket/wstunnel settings (UDP-parity UAPI; targets `wireguard-go` >= 1.3.0; see the
+> WebSocket surface in `docs/ARCHITECTURE.md`), and CI-built release artifacts for Linux and macOS
+> (GitHub releases + the `danielealbano/homebrew-wireguard` tap). Non-trivial work proceeds via the development
 > pipeline per `development_pipeline.md`. The canonical docs MUST be kept current as changes
 > land.
 

@@ -108,8 +108,35 @@ Keys are hex on the wire (base64 in config files and display). `wg` validates ev
 line, bounds every number (`NUM(max)` macro), and treats protocol violations as `-EPROTO`.
 The device public key is never sent by the daemon — `wg` derives it from the returned private
 key. This protocol is the compatibility contract with `wireguard-go` and every other
-userspace implementation; the WebSocket roadmap item adds keys here, never changes existing
-ones.
+userspace implementation; the WebSocket keys below are **additive** and coordinated with the
+sibling `wireguard-go` fork (≥ 1.3.0).
+
+### 4a. WebSocket/wstunnel transport surface
+
+The sibling `wireguard-go` fork (≥ 1.3.0) carries WireGuard over a WebSocket/wstunnel connection
+using a **UDP-parity** UAPI: `endpoint=` is a plain resolved `ip:port` for **every** transport,
+and the carrier is chosen by a mandatory per-peer `transport=` key. `wg` maps its CamelCase
+config-file/CLI keys onto these UAPI keys:
+
+| Config (`[Peer]`) | UAPI | Notes |
+|---|---|---|
+| `Endpoint = ws(s)://host:port/path` | `endpoint=ip:port` **+** `ws_url=<URL>` | host resolved host-side via the same resolver as UDP (IPv6 re-bracketed) |
+| `WSMode = websocket\|wstunnel` | `transport=` | inferred; `udp` when the `Endpoint` has no `ws(s)://` scheme |
+| `WSTunnelTarget` | `wstunnel_target` | verbatim `host:port`; required for `wstunnel`, rejected otherwise |
+| `WSBearer` (secret) | `ws_bearer` | CLI reads it from a file so it never sits in `argv` |
+| `WSMask`, `WSTLSCA/Cert/Key/Insecure`, `WSPingInterval`, `WSBackoffMin/Max` | `ws_mask`, `ws_tls_*`, `ws_ping_interval`, `ws_backoff_min/max` | booleans/ms |
+
+| Config (`[Interface]`) | UAPI / effect |
+|---|---|
+| `WSListen`, `WSServerTLSCert/Key`, `WSServerBearer` (secret), `WSTrustedProxies` | `ws_listen`, `ws_server_*`, `ws_trusted_proxies` |
+| `MetricsListen` | consumed by `wg-quick`, exported as the `WG_METRICS_LISTEN` env var (the only remaining env var) |
+
+`transport=` is emitted for **every created peer** (mandatory at creation), tying the userspace
+UAPI path to `wireguard-go` ≥ 1.3.0; the kernel/netlink path never emits it. Device WS keys are
+emitted only when configured (their flags are not default-set), so a plain-UDP `setconf` adds no
+`ws_*` keys — additive interop is preserved. `ipc.c` rejects a WebSocket config on a kernel
+interface with `EOPNOTSUPP`. Secrets (`WSBearer`, `WSServerBearer`) round-trip via `showconf`
+(like `PresharedKey`) but are never shown by `show`/`dump`/`endpoints`.
 
 ## 5. wg-quick Orchestration (Linux flow)
 

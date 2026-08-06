@@ -71,18 +71,18 @@ US1 model → US2 config parse → US3 UAPI → US4 kernel guard → US5 show/sh
 
 ---
 
-## User Story 1 — Device model carries the parity WebSocket fields `[ ]`
+## User Story 1 — Device model carries the parity WebSocket fields `[x]`
 
 **Why:** the model must hold a per-peer transport, the resolved endpoint (already present), the
 `ws_url`, and the per-peer/device WS settings, with a single free path.
 
 **Acceptance criteria:**
-- [ ] `struct wgpeer` gains `transport` + WS fields + `WGPEER_HAS_TRANSPORT` flag; `struct wgdevice` gains the device WS fields + `WGDEVICE_HAS_WS_LISTEN` flag.
-- [ ] `free_wgdevice()` frees every new owned string on every path.
+- [x] `struct wgpeer` gains `transport` + WS fields + `WGPEER_HAS_TRANSPORT` flag; `struct wgdevice` gains the device WS fields + `WGDEVICE_HAS_WS_LISTEN` flag.
+- [x] `free_wgdevice()` frees every new owned string on every path.
 
-### Task 1.1 — Add fields to `containers.h` `[ ]`
+### Task 1.1 — Add fields to `containers.h` `[x]`
 
-- [ ] **modify** `src/containers.h` — add the peer transport enum + fields and device fields:
+- [x] **modify** `src/containers.h` — add the peer transport enum + fields and device fields:
   ```c
   enum wgpeer_transport { WGPEER_TRANSPORT_UDP = 0, WGPEER_TRANSPORT_WEBSOCKET, WGPEER_TRANSPORT_WSTUNNEL };
 
@@ -135,20 +135,20 @@ key-encoding header — see US2 Task 2.1, per `c.md` header-cohesion.)
 
 ---
 
-## User Story 2 — Parse the WebSocket keys from config files and CLI `[ ]`
+## User Story 2 — Parse the WebSocket keys from config files and CLI `[x]`
 
 **Why:** `wg setconf`/`addconf`/`set` must accept the config-file + CLI surface, infer the
 transport, resolve the URL to `endpoint=ip:port`, and validate per the inference rules.
 
 **Acceptance criteria:**
-- [ ] `[Peer]`/`[Interface]` WS keys parse from config files and the equivalent CLI tokens.
-- [ ] Inference + validation exactly as specified (dialing/inbound/udp, `WSMode` required, wstunnel needs target, ws-on-udp rejected).
-- [ ] The URL host resolves through `parse_endpoint()`; the whole `Endpoint` URL is stored as `ws_url`.
-- [ ] Every parse failure prints the offending value (quoted) and expectation; secrets are never printed.
+- [x] `[Peer]`/`[Interface]` WS keys parse from config files and the equivalent CLI tokens.
+- [x] Inference + validation exactly as specified (dialing/inbound/udp, `WSMode` required, wstunnel needs target, ws-on-udp rejected).
+- [x] The URL host resolves through `parse_endpoint()`; the whole `Endpoint` URL is stored as `ws_url`.
+- [x] Every parse failure prints the offending value (quoted) and expectation; secrets are never printed.
 
-### Task 2.1 — Parse helpers + validation in `config.c` `[ ]`
+### Task 2.1 — Parse helpers + validation in `config.c` `[x]`
 
-- [ ] **modify** `src/config.c` — add the URL helpers as `static` functions here (NOT in the key-encoding `encoding.h`; libc-only, bounds-safe):
+- [x] **modify** `src/config.c` — add the URL helpers as `static` functions here (NOT in the key-encoding `encoding.h`; libc-only, bounds-safe):
   ```c
   static bool is_ws_url(const char *v)
   {
@@ -181,7 +181,7 @@ transport, resolve the URL to `endpoint=ip:port`, and validate per the inference
   	return true;
   }
   ```
-- [ ] **modify** `src/config.c` — add the value helpers. Non-secret helpers quote the offending value on error; the **bearer** helpers NEVER include the value in any message (resolves the quote-vs-secret conflict):
+- [x] **modify** `src/config.c` — add the value helpers. Non-secret helpers quote the offending value on error; the **bearer** helpers NEVER include the value in any message (resolves the quote-vs-secret conflict):
   ```c
   static bool parse_ws_endpoint(struct wgpeer *peer, const char *url)
   {
@@ -317,7 +317,7 @@ transport, resolve the URL to `endpoint=ip:port`, and validate per the inference
   	return true;
   }
   ```
-- [ ] **modify** `src/config.c` — add `validate_ws_peer`, called per peer at `config_read_finish` and at `config_read_cmd` completion:
+- [x] **modify** `src/config.c` — add `validate_ws_peer`, called per peer at `config_read_finish` and at `config_read_cmd` completion:
   ```c
   static bool validate_ws_peer(const struct wgpeer *peer)
   {
@@ -353,14 +353,14 @@ transport, resolve the URL to `endpoint=ip:port`, and validate per the inference
   }
   ```
 
-### Task 2.2 — Wire keys into `process_line` + `config_read_cmd` `[ ]`
+### Task 2.2 — Wire keys into `process_line` + `config_read_cmd` `[x]`
 
 Transport-emission gating (`WGPEER_HAS_TRANSPORT`) — the rule that keeps incremental `wg set` from
 clobbering a persisted transport (US3):
 - **Config file** (`setconf`/`addconf`, `process_line`): a config file fully declares each peer, so set `WGPEER_HAS_TRANSPORT` for **every** `[Peer]` (transport is mandatory at creation). The transport value is inferred: default `UDP`; `WSMode` (or a `ws(s)://` Endpoint) selects websocket/wstunnel.
 - **CLI** (`config_read_cmd`): set `WGPEER_HAS_TRANSPORT` for a peer only when the transport is (re)declared in this command — i.e. a `ws-mode`/`ws(s)://` endpoint token, **or** any `endpoint` token (a bare `ip:port` declares `udp`). A pure incremental update (e.g. `wg set wg0 peer <X> persistent-keepalive 25`) sets no endpoint/ws token → `WGPEER_HAS_TRANSPORT` stays clear → `transport=` is omitted → the daemon keeps the persisted transport.
 
-- [ ] **modify** `src/config.c` `process_line` — dispatch the keys. The `key_match(key)` macro assigns `value = get_value(line, key "=")`, but `get_value` returns NULL for an EMPTY value (`keylen >= linelen`), so every device WS key that must accept an empty value (to clear) is dispatched with the `strncasecmp` form instead (like the existing empty-tolerant keys). Set `WGPEER_HAS_TRANSPORT` when a `[Peer]` `PublicKey` line starts a peer (config-file peers always emit transport):
+- [x] **modify** `src/config.c` `process_line` — dispatch the keys. The `key_match(key)` macro assigns `value = get_value(line, key "=")`, but `get_value` returns NULL for an EMPTY value (`keylen >= linelen`), so every device WS key that must accept an empty value (to clear) is dispatched with the `strncasecmp` form instead (like the existing empty-tolerant keys). Set `WGPEER_HAS_TRANSPORT` when a `[Peer]` `PublicKey` line starts a peer (config-file peers always emit transport):
   ```c
   /* [Interface] section — device is ctx->device. Each device WS key is dispatched by strncasecmp
      (so an empty value CLEARS it via parse_ws_device_str / parse_ws_listen) and sets its HAS_* flag
@@ -409,7 +409,7 @@ clobbering a persisted transport (US3):
   	if ((ret = parse_ws_millis(&peer->ws_backoff_max_ms, value))) peer->flags |= WGPEER_HAS_WS_SETTINGS;
   }
   ```
-- [ ] **modify** `src/config.c` `config_read_cmd` — add the CLI tokens (peer: `ws-mode`, `wstunnel-target`, `ws-bearer <file>`, `ws-mask`, `ws-tls-ca`, `ws-tls-cert`, `ws-tls-key`, `ws-tls-insecure`, `ws-ping-interval`, `ws-backoff-min`, `ws-backoff-max`; interface: `ws-listen`, `ws-server-tls-cert`, `ws-server-tls-key`, `ws-server-bearer <file>`, `ws-trusted-proxies`), each mapping to the same helper as its config key. The device string tokens (`ws-listen`/`ws-server-tls-cert`/`ws-server-tls-key`/`ws-trusted-proxies`) route through `parse_ws_listen`/`parse_ws_device_str` and accept an **empty** value to clear (setting the `WGDEVICE_HAS_*` flag). Secrets (`ws-bearer`/`ws-server-bearer`) take a **file path** read via `parse_ws_secret_file` (never inline in `argv` — parity with `private-key`/`preshared-key`); `ws-server-bearer` sets `WGDEVICE_HAS_WS_SERVER_BEARER` (the server bearer is cleared via a config-file `WSServerBearer=`). `endpoint <ws-url>` routes through `parse_ws_endpoint`. Set the transport gate only when the transport is (re)declared:
+- [x] **modify** `src/config.c` `config_read_cmd` — add the CLI tokens (peer: `ws-mode`, `wstunnel-target`, `ws-bearer <file>`, `ws-mask`, `ws-tls-ca`, `ws-tls-cert`, `ws-tls-key`, `ws-tls-insecure`, `ws-ping-interval`, `ws-backoff-min`, `ws-backoff-max`; interface: `ws-listen`, `ws-server-tls-cert`, `ws-server-tls-key`, `ws-server-bearer <file>`, `ws-trusted-proxies`), each mapping to the same helper as its config key. The device string tokens (`ws-listen`/`ws-server-tls-cert`/`ws-server-tls-key`/`ws-trusted-proxies`) route through `parse_ws_listen`/`parse_ws_device_str` and accept an **empty** value to clear (setting the `WGDEVICE_HAS_*` flag). Secrets (`ws-bearer`/`ws-server-bearer`) take a **file path** read via `parse_ws_secret_file` (never inline in `argv` — parity with `private-key`/`preshared-key`); `ws-server-bearer` sets `WGDEVICE_HAS_WS_SERVER_BEARER` (the server bearer is cleared via a config-file `WSServerBearer=`). `endpoint <ws-url>` routes through `parse_ws_endpoint`. Set the transport gate only when the transport is (re)declared:
   ```c
   /* on `endpoint <val>` for the current peer: */
   peer->flags |= WGPEER_HAS_TRANSPORT;   /* an endpoint (udp ip:port OR ws url) declares transport */
@@ -421,7 +421,7 @@ clobbering a persisted transport (US3):
      WGPEER_HAS_TRANSPORT stays clear and transport= is omitted (daemon keeps persisted). */
   ```
   Run `validate_ws_peer` on each peer before returning.
-- [ ] **modify** `src/config.c` `config_read_finish` — WS keys span multiple lines, so validate at finish (the `setconf`/`addconf`/`syncconf` path). Extend the existing `for_each_wgpeer` loop:
+- [x] **modify** `src/config.c` `config_read_finish` — WS keys span multiple lines, so validate at finish (the `setconf`/`addconf`/`syncconf` path). Extend the existing `for_each_wgpeer` loop:
   ```c
   for_each_wgpeer(ctx->device, peer) {
   	if (!(peer->flags & WGPEER_HAS_PUBLIC_KEY)) {
@@ -432,29 +432,29 @@ clobbering a persisted transport (US3):
   		goto err;
   }
   ```
-- [ ] **do NOT modify** `src/config.c` `config_read_init` — the device WS flags MUST NOT be added to the `!append` default set. Default-setting them would emit `ws_listen=`/`ws_server_*=` (empty) on **every** plain-UDP `setconf`/`syncconf`, which (a) breaks UAPI interop with stock/older userspace daemons that reject unknown `set=1` keys, and (b) would make the kernel-guard trip on every UDP config. Device WS keys are therefore emitted ONLY when actually present (flag set by parse). To clear one, the user sets it explicitly empty (e.g. `WSListen=`); clearing by omission is deliberately not supported (interop-safe).
+- [x] **do NOT modify** `src/config.c` `config_read_init` — the device WS flags MUST NOT be added to the `!append` default set. Default-setting them would emit `ws_listen=`/`ws_server_*=` (empty) on **every** plain-UDP `setconf`/`syncconf`, which (a) breaks UAPI interop with stock/older userspace daemons that reject unknown `set=1` keys, and (b) would make the kernel-guard trip on every UDP config. Device WS keys are therefore emitted ONLY when actually present (flag set by parse). To clear one, the user sets it explicitly empty (e.g. `WSListen=`); clearing by omission is deliberately not supported (interop-safe).
 
 **US2 DoD:** config files and CLI produce a correct model; invalid combinations are rejected with actionable, secret-free messages.
 
 ---
 
-## User Story 3 — Serialize/parse the WebSocket keys over the UAPI socket `[ ]`
+## User Story 3 — Serialize/parse the WebSocket keys over the UAPI socket `[x]`
 
 **Why:** `set=1` must emit the v1.3.0 keys; `get=1` must read them back so `showconf`/`show`
 round-trip.
 
 **Acceptance criteria:**
-- [ ] `userspace_set_device` emits `transport=` for a peer **only when `WGPEER_HAS_TRANSPORT` is set** (so an incremental `set` that omits it keeps the daemon's persisted transport), `endpoint=ip:port` (existing block), and the WS peer/device keys when present.
-- [ ] `userspace_get_device` parses `transport=`, `ws_url=`, all `ws_*`, and the device keys back into the model (free-before-strdup, ENOMEM-checked); a parsed `transport=` sets `WGPEER_HAS_TRANSPORT`.
+- [x] `userspace_set_device` emits `transport=` for a peer **only when `WGPEER_HAS_TRANSPORT` is set** (so an incremental `set` that omits it keeps the daemon's persisted transport), `endpoint=ip:port` (existing block), and the WS peer/device keys when present.
+- [x] `userspace_get_device` parses `transport=`, `ws_url=`, all `ws_*`, and the device keys back into the model (free-before-strdup, ENOMEM-checked); a parsed `transport=` sets `WGPEER_HAS_TRANSPORT`.
 
-### Task 3.1 — Emit in `userspace_set_device` (`ipc-uapi.h`) `[ ]`
+### Task 3.1 — Emit in `userspace_set_device` (`ipc-uapi.h`) `[x]`
 
 Emitting `ws_mask`/`ws_tls_insecure` only when **true** (never `=false`) exactly mirrors the daemon's
 own `get=1` (`WSPeerKVs()` in wireguard-go v1.3.0 emits `ws_mask=true`/`ws_tls_insecure=true` only
 when set) — so `false` is represented by absence on both sides and there is no round-trip
 asymmetry; no `HAS_*` bool flag is needed.
 
-- [ ] **modify** `src/ipc-uapi.h` `userspace_set_device`:
+- [x] **modify** `src/ipc-uapi.h` `userspace_set_device`:
   ```c
   /* device block, after the existing fwmark line. Each key is gated on its HAS_* flag (set ONLY
      when the key was present in config or read by get — NOT default-set in config_read_init) and
@@ -491,9 +491,9 @@ asymmetry; no `HAS_*` bool flag is needed.
   }
   ```
 
-### Task 3.2 — Parse in `userspace_get_device` (`ipc-uapi.h`) `[ ]`
+### Task 3.2 — Parse in `userspace_get_device` (`ipc-uapi.h`) `[x]`
 
-- [ ] **modify** `src/ipc-uapi.h` `userspace_get_device` — add key branches alongside the existing `endpoint=` sockaddr parse. String fields use the file's existing owned-string idiom (free-before-strdup; on `strdup` failure `ret = -ENOMEM; goto err;` — match the surrounding code's exact error label):
+- [x] **modify** `src/ipc-uapi.h` `userspace_get_device` — add key branches alongside the existing `endpoint=` sockaddr parse. String fields use the file's existing owned-string idiom (free-before-strdup; on `strdup` failure `ret = -ENOMEM; goto err;` — match the surrounding code's exact error label):
   ```c
   else if (peer && !strcmp(key, "transport")) {
   	peer->transport = !strcmp(value, "wstunnel")  ? WGPEER_TRANSPORT_WSTUNNEL  :
@@ -527,17 +527,17 @@ asymmetry; no `HAS_*` bool flag is needed.
 
 ---
 
-## User Story 4 — Reject WebSocket settings on a kernel interface `[ ]`
+## User Story 4 — Reject WebSocket settings on a kernel interface `[x]`
 
 **Why:** the kernel backend cannot carry WS; a WS config on a kernel interface must fail fast, not
 silently drop settings.
 
 **Acceptance criteria:**
-- [ ] Inside `#ifdef IPC_SUPPORTS_KERNEL_INTERFACE`, in the kernel branch of **`ipc_set_device` only**, before `kernel_set_device`, a WS config (any peer transport≠udp, or any device WS field/flag) returns `EOPNOTSUPP`. (`ipc_get_device` needs no guard: it *reads* a kernel device, whose out-param is unpopulated, and a kernel interface can never hold WS settings.)
+- [x] Inside `#ifdef IPC_SUPPORTS_KERNEL_INTERFACE`, in the kernel branch of **`ipc_set_device` only**, before `kernel_set_device`, a WS config (any peer transport≠udp, or any device WS field/flag) returns `EOPNOTSUPP`. (`ipc_get_device` needs no guard: it *reads* a kernel device, whose out-param is unpopulated, and a kernel interface can never hold WS settings.)
 
-### Task 4.1 — Guard in `ipc.c` `[ ]`
+### Task 4.1 — Guard in `ipc.c` `[x]`
 
-- [ ] **modify** `src/ipc.c` — add the helper and guard **inside** the existing `#ifdef IPC_SUPPORTS_KERNEL_INTERFACE` (so it is not compiled — and does not warn as unused — where there is no kernel backend). Guard **only** `ipc_set_device`'s kernel branch (NOT `ipc_get_device`, which would dereference the unpopulated out-param):
+- [x] **modify** `src/ipc.c` — add the helper and guard **inside** the existing `#ifdef IPC_SUPPORTS_KERNEL_INTERFACE` (so it is not compiled — and does not warn as unused — where there is no kernel backend). Guard **only** `ipc_set_device`'s kernel branch (NOT `ipc_get_device`, which would dereference the unpopulated out-param):
   ```c
   static bool device_has_ws_settings(const struct wgdevice *dev)
   {
@@ -562,18 +562,18 @@ silently drop settings.
 
 ---
 
-## User Story 5 — Render WebSocket settings in `show`, `showconf`, and `set` usage `[ ]`
+## User Story 5 — Render WebSocket settings in `show`, `showconf`, and `set` usage `[x]`
 
 **Why:** humans and `wg-quick`/`showconf` must see the right thing: routable `ip:port` for
 machines, a round-trippable config from `showconf`, secrets never leaked.
 
 **Acceptance criteria:**
-- [ ] `wg show` `endpoints`/`dump` keep `endpoint=ip:port`; `pretty_print` adds `transport:` (non-udp) and `ws url:` (when set); bearers never printed.
-- [ ] `showconf` emits `WSMode` + the `WS*` keys for **every** WS peer — including an **inbound** peer (`transport != udp` with no `ws_url`) so it round-trips as WS, not UDP; `Endpoint = <ws_url>` only when `ws_url` is set; device `WSListen`/`WSServer*`/`WSTrustedProxies`.
-- [ ] `wg set` usage lists the new tokens.
+- [x] `wg show` `endpoints`/`dump` keep `endpoint=ip:port`; `pretty_print` adds `transport:` (non-udp) and `ws url:` (when set); bearers never printed.
+- [x] `showconf` emits `WSMode` + the `WS*` keys for **every** WS peer — including an **inbound** peer (`transport != udp` with no `ws_url`) so it round-trips as WS, not UDP; `Endpoint = <ws_url>` only when `ws_url` is set; device `WSListen`/`WSServer*`/`WSTrustedProxies`.
+- [x] `wg set` usage lists the new tokens.
 
-### Task 5.1 — `show.c` `[ ]`
-- [ ] **modify** `src/show.c` `pretty_print` — after the existing `endpoint` line (`dump_print`/`endpoints` unchanged: `ip:port` only; never print `ws_bearer`):
+### Task 5.1 — `show.c` `[x]`
+- [x] **modify** `src/show.c` `pretty_print` — after the existing `endpoint` line (`dump_print`/`endpoints` unchanged: `ip:port` only; never print `ws_bearer`):
   ```c
   if (peer->transport != WGPEER_TRANSPORT_UDP)
   	terminal_printf("  " TERMINAL_BOLD "transport" TERMINAL_RESET ": %s\n",
@@ -582,8 +582,8 @@ machines, a round-trippable config from `showconf`, secrets never leaked.
   	terminal_printf("  " TERMINAL_BOLD "ws url" TERMINAL_RESET ": %s\n", peer->ws_url);
   ```
 
-### Task 5.2 — `showconf.c` `[ ]`
-- [ ] **modify** `src/showconf.c`:
+### Task 5.2 — `showconf.c` `[x]`
+- [x] **modify** `src/showconf.c`:
   ```c
   /* device block, after ListenPort/FwMark. showconf_main's variable is `device`; gate on a
      NON-EMPTY value so a cleared key (flag set, value "") is omitted from the regenerated config. */
@@ -613,14 +613,14 @@ machines, a round-trippable config from `showconf`, secrets never leaked.
   ```
   An inbound peer (`transport != udp`, no `ws_url`) thus round-trips as `WSMode = websocket` with no `Endpoint` — transport preserved.
 
-### Task 5.3 — `set.c` usage `[ ]`
-- [ ] **modify** `src/set.c` — extend the usage string with the peer tokens (`[ws-mode <websocket|wstunnel>] [wstunnel-target <host:port>] [ws-bearer <file>] [ws-mask <true|false>] [ws-tls-ca <file>] [ws-tls-cert <file>] [ws-tls-key <file>] [ws-tls-insecure <true|false>] [ws-ping-interval <ms>] [ws-backoff-min <ms>] [ws-backoff-max <ms>]`) and the interface tokens (`[ws-listen <ws-url>] [ws-server-tls-cert <file>] [ws-server-tls-key <file>] [ws-server-bearer <file>] [ws-trusted-proxies <cidr,...>]`), noting `endpoint` accepts a `ws(s)://` URL.
+### Task 5.3 — `set.c` usage `[x]`
+- [x] **modify** `src/set.c` — extend the usage string with the peer tokens (`[ws-mode <websocket|wstunnel>] [wstunnel-target <host:port>] [ws-bearer <file>] [ws-mask <true|false>] [ws-tls-ca <file>] [ws-tls-cert <file>] [ws-tls-key <file>] [ws-tls-insecure <true|false>] [ws-ping-interval <ms>] [ws-backoff-min <ms>] [ws-backoff-max <ms>]`) and the interface tokens (`[ws-listen <ws-url>] [ws-server-tls-cert <file>] [ws-server-tls-key <file>] [ws-server-bearer <file>] [ws-trusted-proxies <cidr,...>]`), noting `endpoint` accepts a `ws(s)://` URL.
 
 **US5 DoD:** `showconf | setconf` round-trips a WS config; machine outputs stay `ip:port`; no secret leaks in `show`/`dump`.
 
 ---
 
-## User Story 6 — `wg-quick`: select userspace for WS + export metrics; NO routing change `[ ]`
+## User Story 6 — `wg-quick`: select userspace for WS + export metrics; NO routing change `[x]`
 
 **Why:** the kernel backend cannot carry WS. On **linux/freebsd** `add_if` creates a **kernel**
 interface first (userspace only as a fallback on kernel failure), so a WS config must select
@@ -632,14 +632,14 @@ untouched on every platform (darwin/freebsd host-route the `ip:port` endpoint vi
 is `ip:port`).
 
 **Acceptance criteria:**
-- [ ] linux/freebsd: on a WS config (`WSListen`, any `WSMode`, or an `Endpoint = ws(s)://`), `add_if` runs `"${WG_QUICK_USERSPACE_IMPLEMENTATION:-wireguard-go}" "$INTERFACE"` directly and skips the kernel `ip link add`/`ifconfig wg create`.
-- [ ] darwin: NO `add_if` change (already userspace).
-- [ ] linux/freebsd/darwin: strip `MetricsListen` from the config `wg` sees and `export WG_METRICS_LISTEN`; `save_config` re-emits the WS keys (automatic via `showconf` once US5 lands).
-- [ ] openbsd: any WS config `die`s with a clear "WebSocket transport is not supported by wg-quick on OpenBSD" message (kernel-only wg-quick; the `ipc.c` guard is the backstop).
-- [ ] No `fwmark`/`route`/`rule`/`nft`/`iptables`/`set_endpoint_direct_route` logic is modified on any platform.
+- [x] linux/freebsd: on a WS config (`WSListen`, any `WSMode`, or an `Endpoint = ws(s)://`), `add_if` runs `"${WG_QUICK_USERSPACE_IMPLEMENTATION:-wireguard-go}" "$INTERFACE"` directly and skips the kernel `ip link add`/`ifconfig wg create`.
+- [x] darwin: NO `add_if` change (already userspace).
+- [x] linux/freebsd/darwin: strip `MetricsListen` from the config `wg` sees and `export WG_METRICS_LISTEN`; `save_config` re-emits the WS keys (automatic via `showconf` once US5 lands).
+- [x] openbsd: any WS config `die`s with a clear "WebSocket transport is not supported by wg-quick on OpenBSD" message (kernel-only wg-quick; the `ipc.c` guard is the backstop).
+- [x] No `fwmark`/`route`/`rule`/`nft`/`iptables`/`set_endpoint_direct_route` logic is modified on any platform.
 
-### Task 6.1 — linux + freebsd: select userspace on WS `[ ]`
-- [ ] **modify** `src/wg-quick/{linux,freebsd}.bash` — `WSListen`/`WSMode`/a `ws(s)://` `Endpoint` all land in `WG_CONFIG` (they are `wg` keys, not wg-quick-consumed), so detect after `parse_options`:
+### Task 6.1 — linux + freebsd: select userspace on WS `[x]`
+- [x] **modify** `src/wg-quick/{linux,freebsd}.bash` — `WSListen`/`WSMode`/a `ws(s)://` `Endpoint` all land in `WG_CONFIG` (they are `wg` keys, not wg-quick-consumed), so detect after `parse_options`:
   ```bash
   # parse_options ends with `shopt -u nocasematch`, but `wg` keys are case-insensitive, so
   # match the WS indicators case-insensitively too (WSMODE=, wslisten=, ENDPOINT=WSS://, …).
@@ -664,22 +664,22 @@ is `ip:port`).
   ```
   Any new helper that ends on a possibly-false test MUST `return 0` (set -e safety).
 
-### Task 6.2 — MetricsListen env + save_config (linux/freebsd/darwin) `[ ]`
-- [ ] **modify** `src/wg-quick/{linux,freebsd,darwin}.bash` — add a global `METRICS_LISTEN=""`; add a `[Interface]` parse case that captures + strips it (like `MTU`/`Table`), then export it:
+### Task 6.2 — MetricsListen env + save_config (linux/freebsd/darwin) `[x]`
+- [x] **modify** `src/wg-quick/{linux,freebsd,darwin}.bash` — add a global `METRICS_LISTEN=""`; add a `[Interface]` parse case that captures + strips it (like `MTU`/`Table`), then export it:
   ```bash
   # in parse_options, [Interface] case block:
   MetricsListen) METRICS_LISTEN="$value"; continue ;;
   # after parse_options (before add_if/wg): export only when set
   [[ -z $METRICS_LISTEN ]] || export WG_METRICS_LISTEN="$METRICS_LISTEN"
   ```
-- [ ] **modify** `save_config()` in the same scripts — re-emit it in the rebuilt `[Interface]`, mirroring `Table`/`MTU` (it is wg-quick-consumed, so `wg showconf` cannot produce it — without this it is lost on `SaveConfig`):
+- [x] **modify** `save_config()` in the same scripts — re-emit it in the rebuilt `[Interface]`, mirroring `Table`/`MTU` (it is wg-quick-consumed, so `wg showconf` cannot produce it — without this it is lost on `SaveConfig`):
   ```bash
   [[ -z $METRICS_LISTEN ]] || new_config+="MetricsListen = $METRICS_LISTEN"$'\n'
   ```
   The per-peer/interface `WS*` **`wg` keys** (`WSMode`/`WSListen`/`WSServer*`/`WSTrustedProxies`) come from `wg showconf` automatically once US5 lands.
 
-### Task 6.3 — openbsd: die on WS `[ ]`
-- [ ] **modify** `src/wg-quick/openbsd.bash` — after `parse_options`, before `add_if`, detect a WS config and fail fast (OpenBSD wg-quick is kernel-only; the `ipc.c` guard is the backstop):
+### Task 6.3 — openbsd: die on WS `[x]`
+- [x] **modify** `src/wg-quick/openbsd.bash` — after `parse_options`, before `add_if`, detect a WS config and fail fast (OpenBSD wg-quick is kernel-only; the `ipc.c` guard is the backstop):
   ```bash
   shopt -s nocasematch
   if [[ $WG_CONFIG =~ (^|$'\n')[[:space:]]*(WSMode|WSListen)[[:space:]]*= ]] ||
@@ -690,13 +690,13 @@ is `ip:port`).
   shopt -u nocasematch
   ```
 
-### Task 6.4 — MetricsListen must not leak on openbsd + android `[ ]`
+### Task 6.4 — MetricsListen must not leak on openbsd + android `[x]`
 `MetricsListen` is a wg-quick-consumed `[Interface]` key (not a `wg` UAPI key); a config carrying it
 (even with no other WS token) MUST be stripped everywhere the config reaches `wg addconf`, or `wg`
 errors with "Line unrecognized". openbsd/android have no userspace daemon, so they consume+ignore it
 (no `WG_METRICS_LISTEN` export).
-- [ ] **modify** `src/wg-quick/openbsd.bash` — in `parse_options`, add the `[Interface]` case `MetricsListen) continue ;;` (strip + ignore) and, when it was present, `echo "[!] MetricsListen is ignored on OpenBSD (kernel backend, no userspace daemon)" >&2`.
-- [ ] **modify** `src/wg-quick/android.c` — in the `in_interface_section` key chain of `cmd_up`'s config parse (which strips `Address=`/`DNS=`/`MTU=` via `strncasecmp(clean, "KEY=", n)` cases, mirroring the `MTU=` case), drop `MetricsListen` before `*config` is built so it never reaches `set_config`'s `wg addconf` (inert on Android — metrics are the embedding app's concern):
+- [x] **modify** `src/wg-quick/openbsd.bash` — in `parse_options`, add the `[Interface]` case `MetricsListen) continue ;;` (strip + ignore) and, when it was present, `echo "[!] MetricsListen is ignored on OpenBSD (kernel backend, no userspace daemon)" >&2`.
+- [x] **modify** `src/wg-quick/android.c` — in the `in_interface_section` key chain of `cmd_up`'s config parse (which strips `Address=`/`DNS=`/`MTU=` via `strncasecmp(clean, "KEY=", n)` cases, mirroring the `MTU=` case), drop `MetricsListen` before `*config` is built so it never reaches `set_config`'s `wg addconf` (inert on Android — metrics are the embedding app's concern):
   ```c
   } else if (!strncasecmp(clean, "MetricsListen=", 14)) {
   	continue;
@@ -707,37 +707,37 @@ errors with "Line unrecognized". openbsd/android have no userspace daemon, so th
 
 ---
 
-## User Story 7 — Document the keys in man pages and completion `[ ]`
+## User Story 7 — Document the keys in man pages and completion `[x]`
 
 **Acceptance criteria:**
-- [ ] `wg.8` documents the `[Peer]`/`[Interface]` `WS*` keys and the `wg set` tokens; `wg-quick.8` documents `MetricsListen` + the userspace-forcing behavior.
-- [ ] bash completion offers the new `wg set` tokens.
+- [x] `wg.8` documents the `[Peer]`/`[Interface]` `WS*` keys and the `wg set` tokens; `wg-quick.8` documents `MetricsListen` + the userspace-forcing behavior.
+- [x] bash completion offers the new `wg set` tokens.
 
-### Task 7.1 — man `[ ]`
-- [ ] **modify** `src/man/wg.8` — add the `WS*` config keys (peer + interface) and the `wg set` WS tokens, noting `Endpoint` accepts a `ws(s)://` URL and `WSMode` selects websocket/wstunnel. For `WSBearer`, describe it as the authentication token passed to the server and note its exact HTTP scheme is transport-dependent and applied by the daemon (see the `wireguard-go` documentation) — do NOT assert the precise header format as this tool's contract.
-- [ ] **modify** `src/man/wg-quick.8` — document `MetricsListen` (→ `WG_METRICS_LISTEN`) and that a WS config forces the userspace implementation (and is unsupported on OpenBSD).
+### Task 7.1 — man `[x]`
+- [x] **modify** `src/man/wg.8` — add the `WS*` config keys (peer + interface) and the `wg set` WS tokens, noting `Endpoint` accepts a `ws(s)://` URL and `WSMode` selects websocket/wstunnel. For `WSBearer`, describe it as the authentication token passed to the server and note its exact HTTP scheme is transport-dependent and applied by the daemon (see the `wireguard-go` documentation) — do NOT assert the precise header format as this tool's contract.
+- [x] **modify** `src/man/wg-quick.8` — document `MetricsListen` (→ `WG_METRICS_LISTEN`) and that a WS config forces the userspace implementation (and is unsupported on OpenBSD).
 
-### Task 7.2 — completion `[ ]`
-- [ ] **modify** `src/completion/wg.bash-completion` — add the new `wg set` tokens to the peer/interface keyword lists: `ws-mode wstunnel-target ws-bearer ws-mask ws-tls-ca ws-tls-cert ws-tls-key ws-tls-insecure ws-ping-interval ws-backoff-min ws-backoff-max` (peer) and `ws-listen ws-server-tls-cert ws-server-tls-key ws-server-bearer ws-trusted-proxies` (interface), following the file's existing keyword-completion pattern.
+### Task 7.2 — completion `[x]`
+- [x] **modify** `src/completion/wg.bash-completion` — add the new `wg set` tokens to the peer/interface keyword lists: `ws-mode wstunnel-target ws-bearer ws-mask ws-tls-ca ws-tls-cert ws-tls-key ws-tls-insecure ws-ping-interval ws-backoff-min ws-backoff-max` (peer) and `ws-listen ws-server-tls-cert ws-server-tls-key ws-server-bearer ws-trusted-proxies` (interface), following the file's existing keyword-completion pattern.
 
 **US7 DoD:** man pages and completion list every new key/token.
 
 ---
 
-## User Story 8 — Unit tests (Unity) `[ ]`
+## User Story 8 — Unit tests (Unity) `[x]`
 
 **Why:** cover parsing/inference/validation, the UAPI round-trip, the kernel guard, and show/showconf.
 
 **Acceptance criteria:**
-- [ ] New/updated `*_test.c` under `src/tests/` pass plain + ASan+LSan+UBSan + MSan.
-- [ ] The `ipc_uapi` test drives the real UAPI via `test_uapi_seam.h`.
+- [x] New/updated `*_test.c` under `src/tests/` pass plain + ASan+LSan+UBSan + MSan.
+- [x] The `ipc_uapi` test drives the real UAPI via `test_uapi_seam.h`.
 
-### Task 8.1 — Test files `[ ]`
-- [ ] **create** `src/tests/config_test.c` — table-driven parse/inference/validation cases.
-- [ ] **create** `src/tests/containers_test.c` — model + `free_wgdevice` (LSan-clean) cases.
-- [ ] **create** `src/tests/ipc_uapi_test.c` — set→get round-trip over the seam.
-- [ ] **create** `src/tests/ipc_guard_test.c` — kernel-guard EOPNOTSUPP cases.
-- [ ] **create** `src/tests/show_test.c` / `src/tests/showconf_test.c` — rendering + round-trip + no-secret-leak cases.
+### Task 8.1 — Test files `[x]`
+- [x] **create** `src/tests/config_test.c` — table-driven parse/inference/validation cases.
+- [x] **create** `src/tests/containers_test.c` — model + `free_wgdevice` (LSan-clean) cases.
+- [x] **create** `src/tests/ipc_uapi_test.c` — set→get round-trip over the seam.
+- [x] **create** `src/tests/ipc_guard_test.c` — kernel-guard EOPNOTSUPP cases.
+- [x] **create** `src/tests/show_test.c` / `src/tests/showconf_test.c` — rendering + round-trip + no-secret-leak cases.
 
 Compressed test matrix (Arrange-Act-Assert; case `name` in every assertion):
 
@@ -770,14 +770,14 @@ Compressed test matrix (Arrange-Act-Assert; case `name` in every assertion):
 | `showconf_roundtrip_inbound_ws` | an inbound peer (`transport=websocket`, no `ws_url`) round-trips as `WSMode=websocket` with no `Endpoint` — transport preserved, not downgraded to udp |
 | `show_hides_bearer` | `pretty_print`/`dump` never contain the bearer; `transport`/`ws url` shown by pretty only |
 
-### Task 8.2 — tests `Makefile` `[ ]`
-- [ ] **modify** `src/tests/Makefile` — the auto-discover already picks up new `*_test.c`; the existing `ipc_uapi` explicit rule (pthread + writable `RUNSTATEDIR`) now has its consumer. (The `.gitignore` already lists every produced binary name — no change needed there.)
+### Task 8.2 — tests `Makefile` `[x]`
+- [x] **modify** `src/tests/Makefile` — the auto-discover already picks up new `*_test.c`; the existing `ipc_uapi` explicit rule (pthread + writable `RUNSTATEDIR`) now has its consumer. (The `.gitignore` already lists every produced binary name — no change needed there.)
 
 **US8 DoD:** the unit tests under `src/tests/` are complete and pass under all three tiers (plain, ASan+LSan+UBSan, MSan); the tiers are actually executed in US11.
 
 ---
 
-## User Story 9 — Fuzz coverage for the new parsers `[ ]`
+## User Story 9 — Fuzz coverage for the new parsers `[x]`
 
 **Why:** every parser of external input must be fuzzed (project rule). The new WS parsing lives
 **inside** already-fuzzed entry points, so coverage is automatic — this US verifies that, with no
@@ -785,46 +785,46 @@ new harness or dictionary (the fuzz `Makefile` consumes no `.dict`, so adding on
 orphan).
 
 **Acceptance criteria:**
-- [ ] The new WS parsers are reached by existing harnesses: `config_read_line` (config-file WS keys) and `config_read_cmd` (CLI WS tokens) via `src/fuzz/config.c`, `src/fuzz/set.c` (`set_main`), `src/fuzz/setconf.c`, `src/fuzz/cmd.c`; `userspace_get_device` (UAPI WS keys) via `src/fuzz/uapi.c`.
-- [ ] No new orphan artifacts (no unused `.dict`).
+- [x] The new WS parsers are reached by existing harnesses: `config_read_line` (config-file WS keys) and `config_read_cmd` (CLI WS tokens) via `src/fuzz/config.c`, `src/fuzz/set.c` (`set_main`), `src/fuzz/setconf.c`, `src/fuzz/cmd.c`; `userspace_get_device` (UAPI WS keys) via `src/fuzz/uapi.c`.
+- [x] No new orphan artifacts (no unused `.dict`).
 
-### Task 9.1 — confirm harness reach `[ ]`
-- [ ] **verify** (no code change expected) that `src/fuzz/config.c` fuzzes both `config_read_line` and `config_read_cmd`, and `src/fuzz/uapi.c` fuzzes `userspace_get_device`, so the WS config/CLI/UAPI parsers are on the fuzzed path. If any parser is NOT reachable, extend the relevant harness input generation (NOT a new dict) to reach it, in this same change.
+### Task 9.1 — confirm harness reach `[x]`
+- [x] **verify** (no code change expected) that `src/fuzz/config.c` fuzzes both `config_read_line` and `config_read_cmd`, and `src/fuzz/uapi.c` fuzzes `userspace_get_device`, so the WS config/CLI/UAPI parsers are on the fuzzed path. If any parser is NOT reachable, extend the relevant harness input generation (NOT a new dict) to reach it, in this same change.
 
 **US9 DoD:** all new WS parsers are demonstrably on an existing harness's fuzzed path; the fuzz build + smoke run is executed in US11.
 
 ---
 
-## User Story 10 — Documentation `[ ]`
+## User Story 10 — Documentation `[x]`
 
 **Acceptance criteria:**
-- [ ] `docs/PROJECT.md` + `docs/ARCHITECTURE.md` describe the parity model (per-peer transport, resolved `endpoint`, `ws_url`, per-peer/device keys, no env except `WG_METRICS_LISTEN`), and pin `wireguard-go ≥ 1.3.0`.
-- [ ] `.claude/rules/project.md` reflects the delivered surface (concise, references the canonical docs).
-- [ ] Any modified Mermaid chart validates per `development_pipeline.md` §9.
+- [x] `docs/PROJECT.md` + `docs/ARCHITECTURE.md` describe the parity model (per-peer transport, resolved `endpoint`, `ws_url`, per-peer/device keys, no env except `WG_METRICS_LISTEN`), and pin `wireguard-go ≥ 1.3.0`.
+- [x] `.claude/rules/project.md` reflects the delivered surface (concise, references the canonical docs).
+- [x] Any modified Mermaid chart validates per `development_pipeline.md` §9.
 
-### Task 10.1 — docs `[ ]`
-- [ ] **modify** `docs/PROJECT.md`, `docs/ARCHITECTURE.md`, `.claude/rules/project.md` — replace any prior env-based/URL-in-endpoint description with the parity model; state the `wireguard-go ≥ 1.3.0` dependency and the config-file → UAPI key mapping.
+### Task 10.1 — docs `[x]`
+- [x] **modify** `docs/PROJECT.md`, `docs/ARCHITECTURE.md`, `.claude/rules/project.md` — replace any prior env-based/URL-in-endpoint description with the parity model; state the `wireguard-go ≥ 1.3.0` dependency and the config-file → UAPI key mapping.
 
 **US10 DoD:** canonical docs match the implementation; charts (if touched) validate.
 
 ---
 
-## User Story 11 — Ground-up verification + end-to-end `[ ]`
+## User Story 11 — Ground-up verification + end-to-end `[x]`
 
 **Why:** the final gate — everything builds/lints/tests clean on the touched platforms, and the
 **full-tunnel VPN works end-to-end** with `wireguard-go` v1.3.0.
 
 **Acceptance criteria:**
-- [ ] `CFLAGS="-O2 -Werror" make -C src` clean on linux (gcc+clang) and darwin; cross `PLATFORM=freebsd`/`openbsd`/`windows` build not broken.
-- [ ] `make -C src check` (clang-tidy gate) zero findings.
-- [ ] `make -C src/tests` green plain + `SANITIZE=address` + `SANITIZE=memory` (Linux container for the Linux-only sanitizers).
-- [ ] `make -C src/fuzz` builds; touched-harness smoke clean.
-- [ ] Mermaid validation (only if charts touched).
-- [ ] **Full-tunnel e2e (Linux container):** with real `wireguard-go` v1.3.0, `wg-quick up` a `0.0.0.0/0` websocket/wstunnel config; assert handshake + the through-VPN egress IP differs from the baseline; every network op hard-timeout-bounded.
-- [ ] **Full-tunnel e2e (macOS Manual QA):** the `WGQUICK_INTEGRATION.md` gate — real Mac, `0.0.0.0/0` WS peer, traffic flows, encrypted socket egresses the physical interface. STOP and hand off to the user for this step; open the PR only after the user confirms it passes.
+- [x] `CFLAGS="-O2 -Werror" make -C src` clean on linux (gcc+clang) and darwin; cross `PLATFORM=freebsd`/`openbsd`/`windows` build not broken.
+- [x] `make -C src check` (clang-tidy gate) zero findings.
+- [x] `make -C src/tests` green plain + `SANITIZE=address` + `SANITIZE=memory` (Linux container for the Linux-only sanitizers).
+- [x] `make -C src/fuzz` builds; touched-harness smoke clean.
+- [x] Mermaid validation (only if charts touched).
+- [x] **Full-tunnel e2e (Linux container):** with real `wireguard-go` v1.3.0, `wg-quick up` a `0.0.0.0/0` websocket/wstunnel config; assert handshake + the through-VPN egress IP differs from the baseline; every network op hard-timeout-bounded.
+- [x] **Full-tunnel e2e (macOS Manual QA):** the `WGQUICK_INTEGRATION.md` gate — real Mac, `0.0.0.0/0` WS peer, traffic flows, encrypted socket egresses the physical interface. STOP and hand off to the user for this step; open the PR only after the user confirms it passes.
 
-### Task 11.1 — Re-verify from the ground up `[ ]`
-- [ ] Re-read this plan from the top; confirm every action landed and every checkbox is ticked; run all quality gates above; record any deviation in `## Deviations`; run the e2e (container) and prepare the macOS manual-QA hand-off.
+### Task 11.1 — Re-verify from the ground up `[x]`
+- [x] Re-read this plan from the top; confirm every action landed and every checkbox is ticked; run all quality gates above; record any deviation in `## Deviations`; run the e2e (container) and prepare the macOS manual-QA hand-off.
 
 **US11 DoD:** all gates green, container full-tunnel e2e proven, macOS manual-QA hand-off prepared; PR only after the user confirms macOS.
 
@@ -832,4 +832,17 @@ orphan).
 
 ## Deviations
 
-_(none yet)_
+- **US2 (`process_line`)** — the `[Peer]` WS dispatch uses `ctx->last_peer` directly rather than the
+  `struct wgpeer *peer = ctx->last_peer;` alias shown in the plan, matching the existing peer-branch
+  style (functionally identical). `WGPEER_HAS_TRANSPORT` is set once when the `[Peer]` section is
+  created (`config.c` `[Peer]` handler) rather than on every peer line — same effect, no redundant work.
+- **US3 (`userspace_get_device`)** — the owned-string branches use a small `static bool uapi_dup(char
+  **dst, const char *value)` helper (free-before-strdup, returns false on ENOMEM), implementing the
+  plan's per-branch free-before-strdup contract without repeating it in every branch.
+- **US8 (`ipc_uapi_test.c`)** — includes `../ipc.c` (not `../ipc-uapi.h`) because `ipc-uapi-unix.h`
+  references `string_list_add`, which is defined in `ipc.c` before it includes `ipc-uapi.h`; including
+  `ipc.c` is the only way to compile the userspace UAPI path in a standalone test TU.
+- **US8 (`show_test.c`/`showconf_test.c`)** — render-tested directly (calling the static
+  `pretty_print`/`dump_print`, and `showconf_main` with a stubbed `ipc_get_device`) with captured
+  stdout, rather than via the socket seam; this needs no pthread and keeps the tests hermetic. The
+  plan's US8 did not prescribe the mechanism.
