@@ -23,6 +23,8 @@ POST_UP=( )
 PRE_DOWN=( )
 POST_DOWN=( )
 SAVE_CONFIG=0
+METRICS_LISTEN=""
+WG_HAS_WS=0
 CONFIG_FILE=""
 PROGRAM="${0##*/}"
 ARGS=( "$@" )
@@ -67,11 +69,19 @@ parse_options() {
 			PostUp) POST_UP+=( "$unstripped_value" ); continue ;;
 			PostDown) POST_DOWN+=( "$unstripped_value" ); continue ;;
 			SaveConfig) read_bool SAVE_CONFIG "$value"; continue ;;
+			MetricsListen) METRICS_LISTEN="$value"; continue ;;
 			esac
 		fi
 		WG_CONFIG+="$line"$'\n'
 	done < "$CONFIG_FILE"
+	# WSListen/WSMode/a ws(s):// Endpoint are wg keys and land in WG_CONFIG; detect them (still
+	# under nocasematch, since wg keys are case-insensitive) to force the userspace backend.
+	if [[ $WG_CONFIG =~ (^|$'\n')[[:space:]]*(WSMode|WSListen)[[:space:]]*= ]] ||
+	   [[ $WG_CONFIG =~ (^|$'\n')[[:space:]]*Endpoint[[:space:]]*=[[:space:]]*wss?:// ]]; then
+		WG_HAS_WS=1
+	fi
 	shopt -u nocasematch
+	[[ -z $METRICS_LISTEN ]] || export WG_METRICS_LISTEN="$METRICS_LISTEN"
 }
 
 read_bool() {
@@ -88,6 +98,11 @@ auto_su() {
 
 add_if() {
 	local ret
+	if [[ $WG_HAS_WS -eq 1 ]]; then
+		# The kernel backend cannot carry the WebSocket transport; run the userspace one directly.
+		cmd "${WG_QUICK_USERSPACE_IMPLEMENTATION:-wireguard-go}" "$INTERFACE"
+		return 0
+	fi
 	if ! cmd ip link add dev "$INTERFACE" type wireguard; then
 		ret=$?
 		[[ -e /sys/module/wireguard ]] || ! command -v "${WG_QUICK_USERSPACE_IMPLEMENTATION:-wireguard-go}" >/dev/null && exit $ret
@@ -264,6 +279,7 @@ save_config() {
 	done < <(resolvconf -l "$(resolvconf_iface_prefix)$INTERFACE" 2>/dev/null || cat "/etc/resolvconf/run/interface/$(resolvconf_iface_prefix)$INTERFACE" 2>/dev/null)
 	[[ -n $MTU && $(ip link show dev "$INTERFACE") =~ mtu\ ([0-9]+) ]] && new_config+="MTU = ${BASH_REMATCH[1]}"$'\n'
 	[[ -n $TABLE ]] && new_config+="Table = $TABLE"$'\n'
+	[[ -n $METRICS_LISTEN ]] && new_config+="MetricsListen = $METRICS_LISTEN"$'\n'
 	[[ $SAVE_CONFIG -eq 0 ]] || new_config+=$'SaveConfig = true\n'
 	for cmd in "${PRE_UP[@]}"; do
 		new_config+="PreUp = $cmd"$'\n'

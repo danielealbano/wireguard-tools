@@ -1256,6 +1256,10 @@ static void parse_options(char **iface, char **config, unsigned int *mtu, char *
 			} else if (!strncasecmp(clean, "MTU=", 4) && j > 4) {
 				*mtu = atoi(clean + 4);
 				continue;
+			} else if (!strncasecmp(clean, "MetricsListen=", 14)) {
+				/* Consumed and dropped: metrics are the embedding app's concern on Android,
+				 * so this must not reach `wg addconf` as an unknown key. */
+				continue;
 			}
 		}
 		*config = concat_and_free(*config, "", line);
