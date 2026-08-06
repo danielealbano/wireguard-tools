@@ -371,13 +371,13 @@ static bool parse_ws_endpoint(struct wgpeer *peer, const char *url)
 	char host[256], port[16], hostport[300];
 
 	if (!ws_url_split(url, host, sizeof host, port, sizeof port)) {
-		fprintf(stderr, "Endpoint is not a valid ws(s):// URL: `%s'\n", url);
+		(void) fprintf(stderr, "Endpoint is not a valid ws(s):// URL: `%s'\n", url);
 		return false;
 	}
 	if (strchr(host, ':'))
-		snprintf(hostport, sizeof hostport, "[%s]:%s", host, port);
+		(void) snprintf(hostport, sizeof hostport, "[%s]:%s", host, port);
 	else
-		snprintf(hostport, sizeof hostport, "%s:%s", host, port);
+		(void) snprintf(hostport, sizeof hostport, "%s:%s", host, port);
 	if (!parse_endpoint(&peer->endpoint.addr, hostport))
 		return false;
 	free(peer->ws_url);
@@ -392,7 +392,7 @@ static bool parse_ws_endpoint(struct wgpeer *peer, const char *url)
 static bool parse_ws_mode(enum wgpeer_transport *transport, const char *value)
 {
 	if (strcmp(value, "websocket") != 0 && strcmp(value, "wstunnel") != 0) {
-		fprintf(stderr, "WSMode is neither websocket nor wstunnel: `%s'\n", value);
+		(void) fprintf(stderr, "WSMode is neither websocket nor wstunnel: `%s'\n", value);
 		return false;
 	}
 	*transport = strcmp(value, "wstunnel") == 0 ? WGPEER_TRANSPORT_WSTUNNEL : WGPEER_TRANSPORT_WEBSOCKET;
@@ -409,7 +409,7 @@ static bool parse_ws_target(char **dst, const char *value)
 	for (const char *p = colon ? colon + 1 : ""; !bad && *p; ++p)
 		bad = *p < '0' || *p > '9';
 	if (bad) {
-		fprintf(stderr, "WSTunnelTarget is not in host:port form: `%s'\n", value);
+		(void) fprintf(stderr, "WSTunnelTarget is not in host:port form: `%s'\n", value);
 		return false;
 	}
 	free(*dst);
@@ -428,7 +428,7 @@ static bool parse_ws_bool(bool *dst, const char *value)
 	else if (!strcmp(value, "false"))
 		*dst = false;
 	else {
-		fprintf(stderr, "Expected true or false, got: `%s'\n", value);
+		(void) fprintf(stderr, "Expected true or false, got: `%s'\n", value);
 		return false;
 	}
 	return true;
@@ -440,7 +440,7 @@ static bool parse_ws_millis(uint32_t *dst, const char *value)
 	unsigned long long n = strtoull(value, &end, 10);
 
 	if (*value == '\0' || *end != '\0' || n > 0xffffffffULL) {
-		fprintf(stderr, "Value is not a valid millisecond count: `%s'\n", value);
+		(void) fprintf(stderr, "Value is not a valid millisecond count: `%s'\n", value);
 		return false;
 	}
 	*dst = (uint32_t)n;
@@ -450,7 +450,7 @@ static bool parse_ws_millis(uint32_t *dst, const char *value)
 static bool parse_ws_str(char **dst, const char *value)
 {
 	if (!*value) {
-		fprintf(stderr, "Value is empty\n");
+		(void) fprintf(stderr, "Value is empty\n");
 		return false;
 	}
 	free(*dst);
@@ -467,7 +467,7 @@ static bool parse_ws_str(char **dst, const char *value)
 static bool parse_ws_listen(char **dst, uint32_t *flags, const char *value)
 {
 	if (*value && !is_ws_url(value)) {
-		fprintf(stderr, "WSListen is neither empty nor a ws(s):// URL: `%s'\n", value);
+		(void) fprintf(stderr, "WSListen is neither empty nor a ws(s):// URL: `%s'\n", value);
 		return false;
 	}
 	free(*dst);
@@ -505,7 +505,7 @@ static bool parse_ws_device_str(char **dst, uint32_t *flags, uint32_t bit, const
 static bool parse_ws_secret(char **dst, const char *value)
 {
 	if (!*value) {
-		fprintf(stderr, "A WebSocket bearer value is empty\n");
+		(void) fprintf(stderr, "A WebSocket bearer value is empty\n");
 		return false;
 	}
 	free(*dst);
@@ -527,26 +527,26 @@ static bool parse_ws_secret_file(char **dst, const char *path)
 	size_t len;
 
 	if (!f) {
-		fprintf(stderr, "Unable to open `%s': %s\n", path, strerror(errno));
+		(void) fprintf(stderr, "Unable to open `%s': %s\n", path, strerror(errno));
 		return false;
 	}
 	if (!fgets(buf, sizeof buf, f)) {
-		fclose(f);
-		fprintf(stderr, "Unable to read bearer from `%s'\n", path);
+		(void) fclose(f);
+		(void) fprintf(stderr, "Unable to read bearer from `%s'\n", path);
 		return false;
 	}
 	len = strlen(buf);
 	if (len && buf[len - 1] == '\n')
 		buf[--len] = '\0';
 	else if (len == sizeof buf - 1 && fgetc(f) != EOF) {
-		fclose(f);
+		(void) fclose(f);
 		memset(buf, 0, sizeof buf);
-		fprintf(stderr, "Bearer in `%s' is too long (max %zu bytes)\n", path, sizeof buf - 1);
+		(void) fprintf(stderr, "Bearer in `%s' is too long (max %zu bytes)\n", path, sizeof buf - 1);
 		return false;
 	}
-	fclose(f);
+	(void) fclose(f);
 	if (!len) {
-		fprintf(stderr, "Bearer file `%s' is empty\n", path);
+		(void) fprintf(stderr, "Bearer file `%s' is empty\n", path);
 		return false;
 	}
 	free(*dst);
@@ -569,40 +569,40 @@ static bool validate_ws_peer(const struct wgpeer *peer)
 		return true;
 	if (peer->transport == WGPEER_TRANSPORT_UDP) {
 		if (peer->ws_url) {
-			fprintf(stderr, "A ws(s):// Endpoint requires WSMode\n");
+			(void) fprintf(stderr, "A ws(s):// Endpoint requires WSMode\n");
 			return false;
 		}
 		if (peer->flags & WGPEER_HAS_WS_SETTINGS) {
-			fprintf(stderr, "A UDP peer has WebSocket settings\n");
+			(void) fprintf(stderr, "A UDP peer has WebSocket settings\n");
 			return false;
 		}
 		return true;
 	}
 	if (peer->ws_url) {
 		if (!has_ep) {
-			fprintf(stderr, "A dialing WebSocket peer has no resolved endpoint\n");
+			(void) fprintf(stderr, "A dialing WebSocket peer has no resolved endpoint\n");
 			return false;
 		}
 		if (peer->transport == WGPEER_TRANSPORT_WSTUNNEL && !peer->wstunnel_target) {
-			fprintf(stderr, "WSMode=wstunnel requires WSTunnelTarget\n");
+			(void) fprintf(stderr, "WSMode=wstunnel requires WSTunnelTarget\n");
 			return false;
 		}
 	} else {
 		if (has_ep) {
-			fprintf(stderr, "An inbound WebSocket peer must not set an Endpoint\n");
+			(void) fprintf(stderr, "An inbound WebSocket peer must not set an Endpoint\n");
 			return false;
 		}
 		if (peer->transport == WGPEER_TRANSPORT_WSTUNNEL) {
-			fprintf(stderr, "WSMode=wstunnel requires a ws(s):// Endpoint (wstunnel is a dialing mode)\n");
+			(void) fprintf(stderr, "WSMode=wstunnel requires a ws(s):// Endpoint (wstunnel is a dialing mode)\n");
 			return false;
 		}
 		if (peer->wstunnel_target) {
-			fprintf(stderr, "An inbound WebSocket peer must not set WSTunnelTarget\n");
+			(void) fprintf(stderr, "An inbound WebSocket peer must not set WSTunnelTarget\n");
 			return false;
 		}
 	}
 	if (peer->transport == WGPEER_TRANSPORT_WEBSOCKET && peer->wstunnel_target) {
-		fprintf(stderr, "WSTunnelTarget requires WSMode=wstunnel\n");
+		(void) fprintf(stderr, "WSTunnelTarget requires WSMode=wstunnel\n");
 		return false;
 	}
 	return true;
