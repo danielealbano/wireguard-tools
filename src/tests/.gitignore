@@ -6,3 +6,4 @@ ipc_guard
 showconf
 show
 .rundir
+*.dSYM/
