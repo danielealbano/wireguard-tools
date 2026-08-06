@@ -63,6 +63,13 @@ struct wgpeer {
 		struct sockaddr_in6 addr6;
 	} endpoint;
 
+	/* WebSocket/wstunnel peer settings (userspace UAPI only); mutually exclusive
+	 * with a resolved endpoint above. Presence is a non-NULL pointer. */
+	char *endpoint_url;
+	char *ws_mode;
+	char *wstunnel_target;
+	char *ws_bearer;
+
 	struct timespec64 last_handshake_time;
 	uint64_t rx_bytes, tx_bytes;
 	uint16_t persistent_keepalive_interval;
@@ -76,7 +83,8 @@ enum {
 	WGDEVICE_HAS_PRIVATE_KEY = 1U << 1,
 	WGDEVICE_HAS_PUBLIC_KEY = 1U << 2,
 	WGDEVICE_HAS_LISTEN_PORT = 1U << 3,
-	WGDEVICE_HAS_FWMARK = 1U << 4
+	WGDEVICE_HAS_FWMARK = 1U << 4,
+	WGDEVICE_HAS_WS_LISTEN = 1U << 5
 };
 
 struct wgdevice {
@@ -91,6 +99,10 @@ struct wgdevice {
 	uint32_t fwmark;
 	uint16_t listen_port;
 
+	/* WebSocket listen URL (userspace UAPI only). Gated by WGDEVICE_HAS_WS_LISTEN
+	 * so an explicit empty value (disable) is distinct from absent (preserve). */
+	char *ws_listen;
+
 	struct wgpeer *first_peer, *last_peer;
 };
 
@@ -104,8 +116,13 @@ static inline void free_wgdevice(struct wgdevice *dev)
 	for (struct wgpeer *peer = dev->first_peer, *np = peer ? peer->next_peer : NULL; peer; peer = np, np = peer ? peer->next_peer : NULL) {
 		for (struct wgallowedip *allowedip = peer->first_allowedip, *na = allowedip ? allowedip->next_allowedip : NULL; allowedip; allowedip = na, na = allowedip ? allowedip->next_allowedip : NULL)
 			free(allowedip);
+		free(peer->endpoint_url);
+		free(peer->ws_mode);
+		free(peer->wstunnel_target);
+		free(peer->ws_bearer);
 		free(peer);
 	}
+	free(dev->ws_listen);
 	free(dev);
 }
 
