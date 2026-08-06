@@ -240,8 +240,8 @@ is deliberately NOT used — the upstream code style is preserved to keep the fo
   socket seam; the full **end-to-end** tier (driving `wg`/`wg-quick` against a real backend) is
   still planned (see below).
 - **WebSocket/wstunnel configuration surface** — the sibling `wireguard-go` fork's WebSocket
-  transport is configured entirely through config files/CLI (see `docs/CONFIGURATION`-style
-  layout in `docs/ARCHITECTURE.md` §8). **Bucket B** (per-tunnel, over the UAPI socket): `wg`
+  transport is configured entirely through config files/CLI (see `docs/ARCHITECTURE.md` §4,
+  "WebSocket / wstunnel configuration surface"). **Bucket B** (per-tunnel, over the UAPI socket): `wg`
   parses `WSListen` (`[Interface]`), a `ws(s)://` `Endpoint`, `WSMode`, `WSTunnelTarget`, and
   `WSPeerBearer` (`[Peer]`) from both config files and the `wg set` CLI, serializes them to
   `set=1`, and reads them back from `get=1` (so `showconf` round-trips). **Bucket A**
