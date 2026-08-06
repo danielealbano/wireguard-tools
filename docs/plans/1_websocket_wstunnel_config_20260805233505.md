@@ -764,6 +764,7 @@ validate_ws_config() {
 	         "$WS_TLS_INSECURE" "$WS_BEARER" "$WS_PING_INTERVAL" "$WS_TRUSTED_PROXIES"; do
 		[[ -n $v ]] && die "WebSocket settings require \`Transport = ws'"
 	done
+	return 0   # the trailing [[ … ]] is false for a UDP config; without this, set -e aborts
 }
 
 export_ws_env() {
@@ -779,6 +780,7 @@ export_ws_env() {
 	[[ -n $WS_PING_INTERVAL ]] && export WG_WS_PING_INTERVAL="$WS_PING_INTERVAL"
 	[[ -n $WS_TRUSTED_PROXIES ]] && export WG_WS_TRUSTED_PROXIES="$WS_TRUSTED_PROXIES"
 	[[ -n $WS_METRICS_LISTEN ]] && export WG_METRICS_LISTEN="$WS_METRICS_LISTEN"
+	return 0   # the trailing [[ … ]] is false when WS_METRICS_LISTEN is empty; without this, set -e aborts
 }
 ```
 - [x] **Action 7.1.3** — rewrite `linux.bash` `add_if` to force userspace when `Transport=ws` (skip the
@@ -1018,6 +1020,13 @@ discovery (c.md: parsers get fuzz coverage in the same change). Depends on: US3,
 - **Action 6.3.1 (show_test dump case)** — the `dump` line legitimately prints `(none)` for a peer's
   absent preshared-key and allowed-ips columns, so the URL-in-endpoint-column assertion checks
   `"<url>\t"` (URL followed by the column tab) instead of asserting no `(none)` anywhere.
+- **US7 (`set -e` in the new bash functions)** — found by the live e2e: `validate_ws_config` and
+  `export_ws_env` each ended with a `[[ … ]] && …` whose left side is false for a UDP config / empty
+  var, so the function returned non-zero, and under `wg-quick`'s `set -e` that aborts (`validate_ws_config`
+  would have broken EVERY plain UDP tunnel). Added an explicit `return 0` at the end of both functions
+  in `linux.bash`/`darwin.bash`/`freebsd.bash` and of `validate_ws_config` in `openbsd.bash`. (Inline
+  `[[ … ]] && …` statements elsewhere are exempt from `set -e` via the `&&`-short-circuit rule; only a
+  function's trailing statement determines its return status.)
 - **US8 (set.c usage string)** — beyond the planned man + completion updates, the `set_main` usage
   string in `src/set.c` was extended with the four new CLI tokens (`ws-listen`, `ws-mode`,
   `wstunnel-target`, `ws-bearer`), matching the `wg.8` `set` grammar, to fully match the existing
