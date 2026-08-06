@@ -112,3 +112,33 @@ jobs:
             clang $MSAN -o "msan-$h" "$h.c"
             ./"msan-$h" -max_total_time=30 -print_final_stats=1
           done
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, clang]
+    steps:
+      - name: Install toolchain
+        run: |
+          for i in 1 2 3 4 5; do apt-get update && break || sleep 10; done
+          apt-get install -y -o Acquire::Retries=3 ${{ matrix.cc }} libc6-dev make git ca-certificates
+      - uses: actions/checkout@v4
+      - name: Unit tests (plain)
+        run: make -C src/tests CC=${{ matrix.cc }}
+      - name: Unit tests (ASan+LSan+UBSan)
+        run: make -C src/tests clean && make -C src/tests CC=clang SANITIZE=address
+
+  unit-tests-msan:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - name: Install toolchain
+        run: |
+          for i in 1 2 3 4 5; do apt-get update && break || sleep 10; done
+          apt-get install -y -o Acquire::Retries=3 clang llvm libc6-dev make git ca-certificates
+      - uses: actions/checkout@v4
+      - name: Unit tests (MemorySanitizer)
+        run: make -C src/tests SANITIZE=memory
