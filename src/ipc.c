@@ -86,11 +86,34 @@ int ipc_get_device(struct wgdevice **dev, const char *iface)
 #endif
 }
 
+#ifdef IPC_SUPPORTS_KERNEL_INTERFACE
+/* The kernel backend cannot carry the WebSocket transport. Test values (not the HAS_* flags, which
+ * are not default-set and can be present with an empty/cleared value) so this fires only on real
+ * WebSocket content. */
+static bool device_has_ws_settings(const struct wgdevice *dev)
+{
+	struct wgpeer *peer;
+
+	if ((dev->ws_listen && *dev->ws_listen) || dev->ws_server_tls_cert || dev->ws_server_tls_key ||
+	    dev->ws_server_bearer || dev->ws_trusted_proxies)
+		return true;
+	for (peer = dev->first_peer; peer; peer = peer->next_peer) {
+		if (peer->transport != WGPEER_TRANSPORT_UDP)
+			return true;
+	}
+	return false;
+}
+#endif
+
 int ipc_set_device(struct wgdevice *dev)
 {
 #ifdef IPC_SUPPORTS_KERNEL_INTERFACE
 	if (userspace_has_wireguard_interface(dev->name))
 		return userspace_set_device(dev);
+	if (device_has_ws_settings(dev)) {
+		errno = EOPNOTSUPP;
+		return -EOPNOTSUPP;
+	}
 	return kernel_set_device(dev);
 #else
 	return userspace_set_device(dev);
