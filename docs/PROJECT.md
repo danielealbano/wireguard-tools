@@ -213,6 +213,16 @@ the upstream code style is preserved to keep the fork's diff minimal.
 
 **Delivered**
 
+- **WebSocket/wstunnel settings support** — the sibling `wireguard-go` fork's per-peer WebSocket
+  transport is configured entirely through configuration files and CLI, targeting **`wireguard-go`
+  ≥ 1.3.0** and its UDP-parity UAPI. `wg` infers a per-peer `transport=udp|websocket|wstunnel`,
+  resolves a `ws(s)://` `Endpoint` host-side to a routable `endpoint=ip:port` (exactly like UDP)
+  and emits the URL as a separate `ws_url=`, plus per-peer `WSMode`/`WSTunnelTarget`/`WSBearer`/
+  `WSMask`/`WSTLS*`/`WSPing/Backoff*` keys and device `WSListen`/`WSServer*`/`WSTrustedProxies`
+  keys. There are **no `WG_WS_*` environment variables**; only `MetricsListen`→`WG_METRICS_LISTEN`
+  remains. `wg-quick` selects the userspace backend when a WebSocket config is present (kernel
+  backends are rejected with `EOPNOTSUPP`; OpenBSD dies with a clear message) and makes no routing
+  changes. Config→UAPI mapping is in `docs/ARCHITECTURE.md`.
 - **Sanitizer investigation** — the codebase was exercised under ASan+LSan+UBSan and MSan
   (CLI, config, key, and UAPI-parser workloads) plus the fuzzers: **zero runtime findings,
   zero fuzzer crashes**. There was no hardening backlog; sanitizer coverage is now enforced in
@@ -237,15 +247,6 @@ the upstream code style is preserved to keep the fork's diff minimal.
    both the kernel netlink path and the userspace UAPI path via the sibling `wireguard-go`).
    The CI test/e2e jobs and Makefile `test` target land with it; e2e obtains `wireguard-go`
    from the sibling fork's **latest GitHub release** (local e2e uses a locally built one).
-2. **WebSocket settings support** — surface the sibling `wireguard-go` fork's WebSocket
-   transport entirely through configuration files: new `[Interface]`/`[Peer]` keys parsed by
-   `wg` and mapped onto the additive UAPI keys (`ws_listen`; per-peer `ws_mode`, `ws_target`,
-   `ws_bearer`; `ws(s)://` endpoint URLs), plus daemon-level keys consumed by `wg-quick` and
-   handed to the daemon at launch via the sibling fork's `WG_TRANSPORT`/`WG_WS_*` bootstrap
-   environment variables (daemon-side variables of `wireguard-go`, invisible to end users —
-   consistent with this repo's env-vars-only-tune-tool-behavior convention). Requires extending the endpoint model beyond `sockaddr`,
-   URL-aware show/showconf output, a clean error on kernel backends, man-page and completion
-   updates, and fuzz/test coverage.
-3. **Homebrew tap** — a `danielealbano/homebrew-wireguard` tap with formulas for this fork
+2. **Homebrew tap** — a `danielealbano/homebrew-wireguard` tap with formulas for this fork
    and the `wireguard-go` fork, installing the prebuilt release binaries. Debian/Ubuntu
    packaging is deliberately out of scope for now.

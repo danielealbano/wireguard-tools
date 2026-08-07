@@ -24,6 +24,7 @@ POST_UP=( )
 PRE_DOWN=( )
 POST_DOWN=( )
 SAVE_CONFIG=0
+WG_HAS_WS=0
 CONFIG_FILE=""
 PROGRAM="${0##*/}"
 ARGS=( "$@" )
@@ -68,10 +69,16 @@ parse_options() {
 			PostUp) POST_UP+=( "$unstripped_value" ); continue ;;
 			PostDown) POST_DOWN+=( "$unstripped_value" ); continue ;;
 			SaveConfig) read_bool SAVE_CONFIG "$value"; continue ;;
+			MetricsListen) echo "[!] MetricsListen is ignored on OpenBSD (kernel backend, no userspace daemon)" >&2; continue ;;
 			esac
 		fi
 		WG_CONFIG+="$line"$'\n'
 	done < "$CONFIG_FILE"
+	# OpenBSD wg-quick is kernel-only; flag a WebSocket config so cmd_up can fail fast.
+	if [[ $WG_CONFIG =~ (^|$'\n')[[:space:]]*(WSMode|WSListen)[[:space:]]*= ]] ||
+	   [[ $WG_CONFIG =~ (^|$'\n')[[:space:]]*Endpoint[[:space:]]*=[[:space:]]*wss?:// ]]; then
+		WG_HAS_WS=1
+	fi
 	shopt -u nocasematch
 }
 
@@ -416,6 +423,7 @@ cmd_usage() {
 
 cmd_up() {
 	local i
+	[[ $WG_HAS_WS -eq 1 ]] && die "WebSocket transport is not supported by wg-quick on OpenBSD"
 	get_real_interface && die "\`$INTERFACE' already exists as \`$REAL_INTERFACE'"
 	trap 'del_if; del_routes; exit' INT TERM EXIT
 	add_if

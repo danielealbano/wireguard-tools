@@ -102,6 +102,18 @@ the commands are executed in order.
 SaveConfig \(em if set to `true', the configuration is saved from the current state of the
 interface upon shutdown. Any changes made to the configuration file before the
 interface is removed will therefore be overwritten.
+.IP \(bu
+MetricsListen \(em a `host:port' for an operational Prometheus metrics listener. It is stripped
+from the configuration passed to \fIwg\fP(8) and exported to the userspace implementation as the
+\fIWG_METRICS_LISTEN\fP environment variable. It is honored on Linux, FreeBSD, and macOS; on
+OpenBSD (which has no userspace backend) it is ignored. Optional.
+
+.P
+A configuration that uses the WebSocket transport \(em an \fIInterface\fP \fIWSListen\fP, a
+\fIPeer\fP \fIWSMode\fP, or a \fIws(s)://\fP \fIEndpoint\fP (see \fBwg\fP(8)) \(em requires the
+userspace implementation (\fIwireguard-go\fP >= 1.3.0), so \fBwg-quick\fP selects it automatically
+instead of the kernel backend. The WebSocket transport is not supported by \fBwg-quick\fP on
+OpenBSD.
 
 .P
 Recommended \fIINTERFACE\fP names include `wg0' or `wgvpn0' or even `wgmgmtlan0'.

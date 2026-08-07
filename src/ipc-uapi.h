@@ -49,6 +49,19 @@ static int userspace_set_device(struct wgdevice *dev)
 		(void) fprintf(f, "listen_port=%u\n", dev->listen_port);
 	if (dev->flags & WGDEVICE_HAS_FWMARK)
 		(void) fprintf(f, "fwmark=%u\n", dev->fwmark);
+	/* Device WebSocket keys are gated on their HAS_* flag (set only when the key was present in
+	 * config or read by get, never default-set) and emitted value-or-empty, so an explicit empty
+	 * value clears the daemon's key while a plain UDP config emits nothing here. */
+	if (dev->flags & WGDEVICE_HAS_WS_LISTEN)
+		(void) fprintf(f, "ws_listen=%s\n", dev->ws_listen ? dev->ws_listen : "");
+	if (dev->flags & WGDEVICE_HAS_WS_SERVER_TLS_CERT)
+		(void) fprintf(f, "ws_server_tls_cert=%s\n", dev->ws_server_tls_cert ? dev->ws_server_tls_cert : "");
+	if (dev->flags & WGDEVICE_HAS_WS_SERVER_TLS_KEY)
+		(void) fprintf(f, "ws_server_tls_key=%s\n", dev->ws_server_tls_key ? dev->ws_server_tls_key : "");
+	if (dev->flags & WGDEVICE_HAS_WS_SERVER_BEARER)
+		(void) fprintf(f, "ws_server_bearer=%s\n", dev->ws_server_bearer ? dev->ws_server_bearer : "");
+	if (dev->flags & WGDEVICE_HAS_WS_TRUSTED_PROXIES)
+		(void) fprintf(f, "ws_trusted_proxies=%s\n", dev->ws_trusted_proxies ? dev->ws_trusted_proxies : "");
 	if (dev->flags & WGDEVICE_REPLACE_PEERS)
 		(void) fprintf(f, "replace_peers=true\n");
 
@@ -63,6 +76,12 @@ static int userspace_set_device(struct wgdevice *dev)
 			key_to_hex(hex, peer->preshared_key);
 			(void) fprintf(f, "preshared_key=%s\n", hex);
 		}
+		/* transport= is emitted only when this operation declares it (an incremental `wg set`
+		 * that omits it keeps the daemon's persisted transport). */
+		if (peer->flags & WGPEER_HAS_TRANSPORT)
+			(void) fprintf(f, "transport=%s\n",
+				       peer->transport == WGPEER_TRANSPORT_WSTUNNEL ? "wstunnel" :
+				       peer->transport == WGPEER_TRANSPORT_WEBSOCKET ? "websocket" : "udp");
 		if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6) {
 			addr_len = 0;
 			if (peer->endpoint.addr.sa_family == AF_INET)
@@ -75,6 +94,35 @@ static int userspace_set_device(struct wgdevice *dev)
 				else
 					(void) fprintf(f, "endpoint=%s:%s\n", host, service);
 			}
+		}
+		/* Emit the ws_* keys for a WebSocket peer, or for an incremental `wg set` that sets a ws
+		 * setting without (re)declaring transport (so the daemon validates it against the peer's
+		 * persisted transport). ws_mask/ws_tls_insecure are emitted only when true, matching the
+		 * daemon's own get=1. */
+		if (peer->transport != WGPEER_TRANSPORT_UDP ||
+		    ((peer->flags & WGPEER_HAS_WS_SETTINGS) && !(peer->flags & WGPEER_HAS_TRANSPORT))) {
+			if (peer->ws_url)
+				(void) fprintf(f, "ws_url=%s\n", peer->ws_url);
+			if (peer->wstunnel_target)
+				(void) fprintf(f, "wstunnel_target=%s\n", peer->wstunnel_target);
+			if (peer->ws_bearer)
+				(void) fprintf(f, "ws_bearer=%s\n", peer->ws_bearer);
+			if (peer->ws_mask)
+				(void) fprintf(f, "ws_mask=true\n");
+			if (peer->ws_tls_ca)
+				(void) fprintf(f, "ws_tls_ca=%s\n", peer->ws_tls_ca);
+			if (peer->ws_tls_cert)
+				(void) fprintf(f, "ws_tls_cert=%s\n", peer->ws_tls_cert);
+			if (peer->ws_tls_key)
+				(void) fprintf(f, "ws_tls_key=%s\n", peer->ws_tls_key);
+			if (peer->ws_tls_insecure)
+				(void) fprintf(f, "ws_tls_insecure=true\n");
+			if (peer->ws_ping_interval_ms)
+				(void) fprintf(f, "ws_ping_interval=%u\n", peer->ws_ping_interval_ms);
+			if (peer->ws_backoff_min_ms)
+				(void) fprintf(f, "ws_backoff_min=%u\n", peer->ws_backoff_min_ms);
+			if (peer->ws_backoff_max_ms)
+				(void) fprintf(f, "ws_backoff_max=%u\n", peer->ws_backoff_max_ms);
 		}
 		if (peer->flags & WGPEER_HAS_PERSISTENT_KEEPALIVE_INTERVAL)
 			(void) fprintf(f, "persistent_keepalive_interval=%u\n", peer->persistent_keepalive_interval);
@@ -135,6 +183,14 @@ out:
 		break; \
 	num; \
 })
+
+/* Replace an owned string field with a copy of a get=1 value (free-before-strdup). */
+static bool uapi_dup(char **dst, const char *value)
+{
+	free(*dst);
+	*dst = strdup(value);
+	return *dst != NULL;
+}
 
 static int userspace_get_device(struct wgdevice **out, const char *iface)
 {
@@ -245,6 +301,80 @@ static int userspace_get_device(struct wgdevice **out, const char *iface)
 				break;
 			}
 			freeaddrinfo(resolved);
+		} else if (peer && !strcmp(key, "transport")) {
+			peer->transport = !strcmp(value, "wstunnel") ? WGPEER_TRANSPORT_WSTUNNEL :
+					  !strcmp(value, "websocket") ? WGPEER_TRANSPORT_WEBSOCKET : WGPEER_TRANSPORT_UDP;
+			peer->flags |= WGPEER_HAS_TRANSPORT;
+		} else if (peer && !strcmp(key, "ws_url")) {
+			if (!uapi_dup(&peer->ws_url, value)) {
+				ret = -ENOMEM;
+				goto err;
+			}
+		} else if (peer && !strcmp(key, "wstunnel_target")) {
+			if (!uapi_dup(&peer->wstunnel_target, value)) {
+				ret = -ENOMEM;
+				goto err;
+			}
+		} else if (peer && !strcmp(key, "ws_bearer")) {
+			if (!uapi_dup(&peer->ws_bearer, value)) {
+				ret = -ENOMEM;
+				goto err;
+			}
+		} else if (peer && !strcmp(key, "ws_tls_ca")) {
+			if (!uapi_dup(&peer->ws_tls_ca, value)) {
+				ret = -ENOMEM;
+				goto err;
+			}
+		} else if (peer && !strcmp(key, "ws_tls_cert")) {
+			if (!uapi_dup(&peer->ws_tls_cert, value)) {
+				ret = -ENOMEM;
+				goto err;
+			}
+		} else if (peer && !strcmp(key, "ws_tls_key")) {
+			if (!uapi_dup(&peer->ws_tls_key, value)) {
+				ret = -ENOMEM;
+				goto err;
+			}
+		} else if (peer && !strcmp(key, "ws_mask")) {
+			peer->ws_mask = !strcmp(value, "true");
+		} else if (peer && !strcmp(key, "ws_tls_insecure")) {
+			peer->ws_tls_insecure = !strcmp(value, "true");
+		} else if (peer && !strcmp(key, "ws_ping_interval")) {
+			peer->ws_ping_interval_ms = NUM(0xffffffffU);
+		} else if (peer && !strcmp(key, "ws_backoff_min")) {
+			peer->ws_backoff_min_ms = NUM(0xffffffffU);
+		} else if (peer && !strcmp(key, "ws_backoff_max")) {
+			peer->ws_backoff_max_ms = NUM(0xffffffffU);
+		} else if (!peer && !strcmp(key, "ws_listen")) {
+			if (!uapi_dup(&dev->ws_listen, value)) {
+				ret = -ENOMEM;
+				goto err;
+			}
+			dev->flags |= WGDEVICE_HAS_WS_LISTEN;
+		} else if (!peer && !strcmp(key, "ws_server_tls_cert")) {
+			if (!uapi_dup(&dev->ws_server_tls_cert, value)) {
+				ret = -ENOMEM;
+				goto err;
+			}
+			dev->flags |= WGDEVICE_HAS_WS_SERVER_TLS_CERT;
+		} else if (!peer && !strcmp(key, "ws_server_tls_key")) {
+			if (!uapi_dup(&dev->ws_server_tls_key, value)) {
+				ret = -ENOMEM;
+				goto err;
+			}
+			dev->flags |= WGDEVICE_HAS_WS_SERVER_TLS_KEY;
+		} else if (!peer && !strcmp(key, "ws_server_bearer")) {
+			if (!uapi_dup(&dev->ws_server_bearer, value)) {
+				ret = -ENOMEM;
+				goto err;
+			}
+			dev->flags |= WGDEVICE_HAS_WS_SERVER_BEARER;
+		} else if (!peer && !strcmp(key, "ws_trusted_proxies")) {
+			if (!uapi_dup(&dev->ws_trusted_proxies, value)) {
+				ret = -ENOMEM;
+				goto err;
+			}
+			dev->flags |= WGDEVICE_HAS_WS_TRUSTED_PROXIES;
 		} else if (peer && !strcmp(key, "persistent_keepalive_interval")) {
 			peer->persistent_keepalive_interval = NUM(0xffffU);
 			peer->flags |= WGPEER_HAS_PERSISTENT_KEEPALIVE_INTERVAL;
